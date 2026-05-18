@@ -45,7 +45,7 @@ dev = [
 ]
 
 [project.scripts]
-elm-alm-py = "elm_alm_py.server:main"
+elm-alm-py = "elm_alm_py.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/elm_alm_py"]
