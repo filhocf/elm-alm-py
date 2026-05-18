@@ -57,3 +57,21 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+@mcp.tool()
+async def debug_rm_catalog() -> dict:
+    """Debug: fetch RM catalog and return raw info."""
+    from .auth import get_client
+    from .config import settings
+
+    client = await get_client()
+    catalog_url = f"{settings.elm_url}/rm/oslc_rm/catalog"
+    resp = await client.get(catalog_url, headers={"Accept": "application/rdf+xml, application/xml"})
+    return {
+        "status": resp.status_code,
+        "content_type": resp.headers.get("content-type", "?"),
+        "body_length": len(resp.text),
+        "body_preview": resp.text[:800],
+        "has_dcterms_title": "<dcterms:title>" in resp.text or "<dc:title>" in resp.text,
+    }

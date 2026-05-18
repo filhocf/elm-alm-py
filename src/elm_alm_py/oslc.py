@@ -95,22 +95,17 @@ async def list_service_providers(domain: str) -> list[dict]:
                 providers.append({"title": title_el.text, "url": about})
 
     # Fallback: regex extraction if ET parsing returns empty (ELM namespace quirks)
-    if not providers and "<dcterms:title>" in xml_text:
+    if not providers:
         import re
 
-        for m in re.finditer(r"<(?:dcterms|dc):title>([^<]+)</(?:dcterms|dc):title>", xml_text):
-            title = m.group(1)
-            # Skip catalog title
-            if title.endswith("Catalog") or title == xml_text.split("<dcterms:title>")[1].split("</")[0]:
-                continue
-            # Find associated services URL
-            svc_url = None
-            svc_match = re.search(
-                r'rdf:resource="([^"]*services[^"]*)"',
-                xml_text[max(0, m.start() - 200) : m.end() + 200],
-            )
-            if svc_match:
-                svc_url = svc_match.group(1)
+        # Match title + services URL pairs (Discovery 1.0 pattern)
+        entries = re.findall(
+            r"<(?:dcterms|dc):title>([^<]+)</(?:dcterms|dc):title>.*?"
+            r"<\w+:services\s+[^>]*rdf:resource=\"([^\"]+)\"",
+            xml_text,
+            re.DOTALL,
+        )
+        for title, svc_url in entries:
             providers.append({"title": title, "url": svc_url})
 
     return providers
