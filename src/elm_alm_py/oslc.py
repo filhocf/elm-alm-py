@@ -74,27 +74,66 @@ async def list_service_providers(domain: str) -> list[dict]:
     catalog_url = await get_catalog_url(domain)
     catalog = await _get_xml(client, catalog_url)
     providers = []
-    for sp in catalog.findall(".//{http://open-services.net/ns/core#}ServiceProvider"):
-        title_el = sp.find("{http://purl.org/dc/terms/}title")
-        about = sp.get(f"{{{NS['rdf']}}}about")
-        if title_el is not None:
-            providers.append({"title": title_el.text, "url": about})
+    # Try OSLC Core namespace first, then Discovery 1.0 (RM uses discovery)
+    sp_paths = [
+        ".//{http://open-services.net/ns/core#}ServiceProvider",
+        ".//{http://open-services.net/xmlns/discovery/1.0/}ServiceProvider",
+    ]
+    for sp_path in sp_paths:
+        for sp in catalog.findall(sp_path):
+            title_el = sp.find("{http://purl.org/dc/terms/}title")
+            about = sp.get(f"{{{NS['rdf']}}}about")
+            # Discovery 1.0 uses services/@rdf:resource as URL
+            if about is None:
+                svc_el = sp.find("{http://open-services.net/xmlns/discovery/1.0/}services")
+                if svc_el is not None:
+                    about = svc_el.get(f"{{{NS['rdf']}}}resource")
+            if title_el is not None:
+                providers.append({"title": title_el.text, "url": about})
     return providers
 
 
 async def _find_query_base(domain: str, project_url: str) -> str:
     """Find the OSLC query base URL for a project's service provider."""
     client = await get_client()
-    sp = await _get_xml(client, project_url)
     resource_type = QUERY_RESOURCE_TYPE[domain]
-    # Look for queryBase in services matching our resource type
-    for svc in sp.iter(f"{{{NS['oslc']}}}service"):
-        for qc in svc.iter(f"{{{NS['oslc']}}}QueryCapability"):
+
+    # RM (DOORS Next): uses /views endpoint with projectURL parameter
+    if domain == "rm" and project_url and "services.xml" in project_url:
+        # Extract project ID from services.xml URL
+        # Pattern: /rm/oslc_rm/{project_id}/services.xml
+        parts = project_url.split("/")
+        idx = parts.index("oslc_rm") if "oslc_rm" in parts else -1
+        if idx >= 0 and idx + 1 < len(parts):
+            project_id = parts[idx + 1]
+            return (
+                f"{settings.elm_url}/rm/views?oslc.query=true&projectURL={settings.elm_url}/rm/rm-projects/{project_id}"
+            )
+
+    # CCM/QM: derive services endpoint from catalog URL
+    urls_to_try = []
+    if project_url and not project_url.endswith("services.xml"):
+        urls_to_try = [project_url.rstrip("/") + "/services", project_url]
+    else:
+        urls_to_try = [project_url.replace("/services.xml", "/services"), project_url]
+
+    for url in urls_to_try:
+        try:
+            sp = await _get_xml(client, url)
+        except Exception:
+            continue
+        for qc in sp.iter(f"{{{NS['oslc']}}}QueryCapability"):
             rt_el = qc.find(f"{{{NS['oslc']}}}resourceType")
             if rt_el is not None and rt_el.get(f"{{{NS['rdf']}}}resource") == resource_type:
                 qb = qc.find(f"{{{NS['oslc']}}}queryBase")
                 if qb is not None:
                     return qb.get(f"{{{NS['rdf']}}}resource")
+        # Fallback: any queryBase
+        for qc in sp.iter(f"{{{NS['oslc']}}}QueryCapability"):
+            qb = qc.find(f"{{{NS['oslc']}}}queryBase")
+            if qb is not None:
+                return qb.get(f"{{{NS['rdf']}}}resource")
+
     raise ValueError(f"No query capability found for {domain} in project '{project_url}'")
 
 
@@ -117,11 +156,49 @@ async def query_resources(domain: str, project: str, where: str | None = None) -
     if where:
         params["oslc.where"] = where
     params["oslc.pageSize"] = "50"
+
+    # If query_base already has query params (e.g., RM /views?oslc.query=true&projectURL=...),
+    # merge our params into the existing URL
+    if "?" in query_base:
+        from urllib.parse import urlparse, parse_qs, urlunparse
+
+        parsed = urlparse(query_base)
+        existing_params = parse_qs(parsed.query, keep_blank_values=True)
+        # Flatten single-value lists
+        merged = {k: v[0] if len(v) == 1 else v for k, v in existing_params.items()}
+        merged.update(params)
+        url = urlunparse(parsed._replace(query=""))
+        params = merged
+    else:
+        url = query_base
+
     resp = await client.get(
-        query_base,
+        url,
         params=params,
         headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
     )
+    # Some domains (QM) don't support JSON — fallback to XML
+    if resp.status_code == 406:
+        resp = await client.get(
+            url,
+            params=params,
+            headers={"Accept": "application/xml", "OSLC-Core-Version": "2.0"},
+        )
+        resp.raise_for_status()
+        # Parse XML response into list of resource URIs
+        from xml.etree import ElementTree as ET
+
+        root = ET.fromstring(resp.text)
+        results = []
+        for member in root.iter(f"{{{NS['rdf']}}}Description"):
+            about = member.get(f"{{{NS['rdf']}}}about")
+            title_el = member.find("{http://purl.org/dc/terms/}title")
+            entry = {"rdf:about": about}
+            if title_el is not None:
+                entry["dcterms:title"] = title_el.text
+            results.append(entry)
+        return results if results else [{"raw_xml": resp.text[:2000]}]
+
     resp.raise_for_status()
     data = resp.json()
     # OSLC JSON responses have members in rdfs:member or oslc:results
