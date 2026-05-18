@@ -70,43 +70,35 @@ async def get_catalog_url(domain: str) -> str:
 
 async def list_service_providers(domain: str) -> list[dict]:
     """List all service providers (projects) for a domain."""
+    import re
+
     client = await get_client()
     catalog_url = await get_catalog_url(domain)
     resp = await client.get(catalog_url, headers={"Accept": "application/rdf+xml, application/xml"})
     resp.raise_for_status()
     xml_text = resp.text
-    catalog = ET.fromstring(xml_text)
     providers = []
-    # Try OSLC Core namespace first, then Discovery 1.0 (RM uses discovery)
-    sp_paths = [
-        ".//{http://open-services.net/ns/core#}ServiceProvider",
-        ".//{http://open-services.net/xmlns/discovery/1.0/}ServiceProvider",
-    ]
-    for sp_path in sp_paths:
-        for sp in catalog.findall(sp_path):
-            title_el = sp.find("{http://purl.org/dc/terms/}title")
-            about = sp.get(f"{{{NS['rdf']}}}about")
-            # Discovery 1.0 uses services/@rdf:resource as URL
-            if about is None:
-                svc_el = sp.find("{http://open-services.net/xmlns/discovery/1.0/}services")
-                if svc_el is not None:
-                    about = svc_el.get(f"{{{NS['rdf']}}}resource")
-            if title_el is not None:
-                providers.append({"title": title_el.text, "url": about})
 
-    # Fallback: regex extraction if ET parsing returns empty (ELM namespace quirks)
-    if not providers:
-        import re
-
-        # Match title + services URL pairs (Discovery 1.0 pattern)
+    # RM (Discovery 1.0): use regex directly — ET has issues in MCP stdio context
+    if domain == "rm":
         entries = re.findall(
-            r"<(?:dcterms|dc):title>([^<]+)</(?:dcterms|dc):title>.*?"
+            r"<\w+:ServiceProvider>\s*"
+            r"<(?:\w+:)?title>([^<]+)</(?:\w+:)?title>\s*.*?"
             r"<\w+:services\s+[^>]*rdf:resource=\"([^\"]+)\"",
             xml_text,
             re.DOTALL,
         )
         for title, svc_url in entries:
             providers.append({"title": title, "url": svc_url})
+        return providers
+
+    # CCM/QM: parse with ElementTree (OSLC Core namespace)
+    catalog = ET.fromstring(xml_text)
+    for sp in catalog.findall(".//{http://open-services.net/ns/core#}ServiceProvider"):
+        title_el = sp.find("{http://purl.org/dc/terms/}title")
+        about = sp.get(f"{{{NS['rdf']}}}about")
+        if title_el is not None:
+            providers.append({"title": title_el.text, "url": about})
 
     return providers
 

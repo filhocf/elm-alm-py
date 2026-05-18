@@ -16,17 +16,19 @@ ROOTSERVICES_XML = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 CATALOG_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-    xmlns:oslc="http://open-services.net/ns/core#"
-    xmlns:dcterms="http://purl.org/dc/terms/">
-    <oslc:ServiceProviderCatalog>
-        <oslc:serviceProvider>
-            <oslc:ServiceProvider rdf:about="https://alm.dataprev.gov.br/rm/oslc_rm/sp/1">
-                <dcterms:title>My Project</dcterms:title>
-            </oslc:ServiceProvider>
-        </oslc:serviceProvider>
-    </oslc:ServiceProviderCatalog>
-</rdf:RDF>
+<oslc_disc:ServiceProviderCatalog
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:oslc_disc="http://open-services.net/xmlns/discovery/1.0/"
+    rdf:about="https://alm.dataprev.gov.br/rm/oslc_rm/catalog">
+    <dcterms:title>RMCatalog</dcterms:title>
+    <oslc_disc:entry>
+        <oslc_disc:ServiceProvider>
+            <dcterms:title>My Project</dcterms:title>
+            <oslc_disc:services rdf:resource="https://alm.dataprev.gov.br/rm/oslc_rm/_abc123/services.xml"/>
+        </oslc_disc:ServiceProvider>
+    </oslc_disc:entry>
+</oslc_disc:ServiceProviderCatalog>
 """
 
 
@@ -56,4 +58,4 @@ async def test_list_service_providers():
     providers = await oslc.list_service_providers("rm")
     assert len(providers) == 1
     assert providers[0]["title"] == "My Project"
-    assert providers[0]["url"] == "https://alm.dataprev.gov.br/rm/oslc_rm/sp/1"
+    assert providers[0]["url"] == "https://alm.dataprev.gov.br/rm/oslc_rm/_abc123/services.xml"
