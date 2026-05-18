@@ -59,9 +59,9 @@ def login():
 
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] == "login":
+    if len(sys.argv) > 1 and sys.argv[1] == "login":
         login()
-    elif sys.argv[1] == "serve":
+    elif len(sys.argv) < 2 or sys.argv[1] == "serve":
         from .server import main as serve
         serve()
     else:
