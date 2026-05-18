@@ -1,8 +1,14 @@
 """Form-based Jazz authentication with cookie management."""
 
+import logging
+
 import httpx
 
 from .config import settings
+
+# Suppress httpx info logs (interfere with MCP stdio)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 _client: httpx.AsyncClient | None = None
 
