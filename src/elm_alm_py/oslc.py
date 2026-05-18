@@ -72,7 +72,10 @@ async def list_service_providers(domain: str) -> list[dict]:
     """List all service providers (projects) for a domain."""
     client = await get_client()
     catalog_url = await get_catalog_url(domain)
-    catalog = await _get_xml(client, catalog_url)
+    resp = await client.get(catalog_url, headers={"Accept": "application/rdf+xml, application/xml"})
+    resp.raise_for_status()
+    xml_text = resp.text
+    catalog = ET.fromstring(xml_text)
     providers = []
     # Try OSLC Core namespace first, then Discovery 1.0 (RM uses discovery)
     sp_paths = [
@@ -90,6 +93,26 @@ async def list_service_providers(domain: str) -> list[dict]:
                     about = svc_el.get(f"{{{NS['rdf']}}}resource")
             if title_el is not None:
                 providers.append({"title": title_el.text, "url": about})
+
+    # Fallback: regex extraction if ET parsing returns empty (ELM namespace quirks)
+    if not providers and "<dcterms:title>" in xml_text:
+        import re
+
+        for m in re.finditer(r"<(?:dcterms|dc):title>([^<]+)</(?:dcterms|dc):title>", xml_text):
+            title = m.group(1)
+            # Skip catalog title
+            if title.endswith("Catalog") or title == xml_text.split("<dcterms:title>")[1].split("</")[0]:
+                continue
+            # Find associated services URL
+            svc_url = None
+            svc_match = re.search(
+                r'rdf:resource="([^"]*services[^"]*)"',
+                xml_text[max(0, m.start() - 200) : m.end() + 200],
+            )
+            if svc_match:
+                svc_url = svc_match.group(1)
+            providers.append({"title": title, "url": svc_url})
+
     return providers
 
 
