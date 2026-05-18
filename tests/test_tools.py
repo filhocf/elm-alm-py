@@ -86,6 +86,7 @@ async def test_get_workitem():
         mock.return_value = {"dcterms:title": "Fix login", "dcterms:identifier": "123"}
         result = await get_workitem("123")
         assert "123" in mock.call_args[0][0]
+        assert result["dcterms:title"] == "Fix login"
 
 
 @pytest.mark.asyncio

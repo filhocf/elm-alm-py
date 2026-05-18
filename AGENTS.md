@@ -1,0 +1,60 @@
+# AGENTS.md — elm-alm-py
+
+## Project Overview
+
+MCP server providing read-only access to IBM Engineering Lifecycle Management (ELM) via OSLC REST APIs. Covers DOORS Next (RM), RTC (CCM), and ETM (QM) domains with form-based Jazz authentication.
+
+## Architecture
+
+```
+src/elm_alm_py/
+├── __init__.py       # Package version
+├── cli.py            # CLI entry point: 'login' (credential setup) or 'serve' (MCP stdio)
+├── config.py         # Settings via pydantic-settings (env vars + ~/.elm_creds.json fallback)
+├── auth.py           # Jazz form-based auth, singleton httpx.AsyncClient with cookies
+├── oslc.py           # OSLC service discovery + query builder (XML parsing, JSON responses)
+└── server.py         # FastMCP server with 6 tools (list_projects, search/get for RM/CCM/QM)
+
+tests/
+├── test_auth.py      # Auth flow mocking
+├── test_oslc.py      # OSLC discovery + query mocking
+├── test_server.py    # MCP server integration
+├── test_tools.py     # Tool-level tests
+└── test_errors.py    # Error handling paths
+
+docs/
+└── SPEC.md           # OSLC architecture, auth flow, resource types
+```
+
+## Data Flow
+
+```
+Client → FastMCP (stdio) → server.py → oslc.py → auth.py (cookies) → ELM server (OSLC XML/JSON)
+```
+
+## Key Conventions
+
+- **Config**: env vars `ELM_URL`, `ELM_USER`, `ELM_PASSWORD` or `~/.elm_creds.json` (password base64-encoded)
+- **Auth**: Jazz form-based (`/jts/j_security_check`). Failure detected via `X-com-ibm-team-repository-web-auth-msg` header
+- **OSLC namespaces**: ELM 7.x uses v1 namespaces in rootservices (fallback to v2)
+- **Errors**: `ValueError` for user errors (bad domain, project not found). `RuntimeError` for auth failures
+- **SSL**: `verify=False` (internal certificates)
+- **Naming**: snake_case functions, PascalCase classes
+
+## Adding a New Tool
+
+1. Add tool function in `server.py` with `@mcp.tool()` decorator
+2. Implement OSLC logic in `oslc.py` (reuse `get_client()`, `_get_xml()`, `_get_json()`)
+3. Add test in `tests/test_tools.py` using `respx` to mock HTTP
+4. Run: `uv run pytest tests/ -v && uv run ruff check src/ tests/`
+
+## Tests
+
+```bash
+uv sync --group dev
+uv run pytest tests/ -v --cov=elm_alm_py --cov-report=term-missing
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+```
+
+Mock HTTP with `respx`. All tests are async (`asyncio_mode = "auto"`).

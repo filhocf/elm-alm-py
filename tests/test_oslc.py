@@ -39,7 +39,9 @@ async def cleanup():
 @respx.mock
 async def test_get_catalog_url(monkeypatch):
     respx.post("https://alm.dataprev.gov.br/jts/j_security_check").mock(return_value=httpx.Response(200))
-    respx.get("https://alm.dataprev.gov.br/rm/rootservices").mock(return_value=httpx.Response(200, text=ROOTSERVICES_XML))
+    respx.get("https://alm.dataprev.gov.br/rm/rootservices").mock(
+        return_value=httpx.Response(200, text=ROOTSERVICES_XML)
+    )
     url = await oslc.get_catalog_url("rm")
     assert url == "https://alm.dataprev.gov.br/rm/oslc_rm/catalog"
 
@@ -47,7 +49,9 @@ async def test_get_catalog_url(monkeypatch):
 @respx.mock
 async def test_list_service_providers():
     respx.post("https://alm.dataprev.gov.br/jts/j_security_check").mock(return_value=httpx.Response(200))
-    respx.get("https://alm.dataprev.gov.br/rm/rootservices").mock(return_value=httpx.Response(200, text=ROOTSERVICES_XML))
+    respx.get("https://alm.dataprev.gov.br/rm/rootservices").mock(
+        return_value=httpx.Response(200, text=ROOTSERVICES_XML)
+    )
     respx.get("https://alm.dataprev.gov.br/rm/oslc_rm/catalog").mock(return_value=httpx.Response(200, text=CATALOG_XML))
     providers = await oslc.list_service_providers("rm")
     assert len(providers) == 1

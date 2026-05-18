@@ -63,6 +63,7 @@ def main():
         login()
     elif len(sys.argv) < 2 or sys.argv[1] == "serve":
         from .server import main as serve
+
         serve()
     else:
         print("Uso: elm-alm-py [login|serve]")
