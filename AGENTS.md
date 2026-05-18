@@ -2,18 +2,18 @@
 
 ## Project Overview
 
-MCP server providing read-only access to IBM Engineering Lifecycle Management (ELM) via OSLC REST APIs. Covers DOORS Next (RM), RTC (CCM), and ETM (QM) domains with form-based Jazz authentication.
+MCP server providing read-only access to IBM Engineering Lifecycle Management (ELM) via OSLC REST APIs. Covers DOORS Next (RM), RTC (CCM), and ETM (QM) domains with form-based Jazz authentication. Tested against ELM 7.0.3 at alm.dataprev.gov.br.
 
 ## Architecture
 
 ```
 src/elm_alm_py/
 ├── __init__.py       # Package version
-├── cli.py            # CLI entry point: 'login' (credential setup) or 'serve' (MCP stdio)
+├── cli.py            # CLI: 'login' (credential setup) or 'serve' (MCP stdio)
 ├── config.py         # Settings via pydantic-settings (env vars + ~/.elm_creds.json fallback)
 ├── auth.py           # Jazz form-based auth, singleton httpx.AsyncClient with cookies
-├── oslc.py           # OSLC service discovery + query builder (XML parsing, JSON responses)
-└── server.py         # FastMCP server with 6 tools (list_projects, search/get for RM/CCM/QM)
+├── oslc.py           # OSLC service discovery + query (handles 3 different ELM API patterns)
+└── server.py         # FastMCP server with 6 tools
 
 tests/
 ├── test_auth.py      # Auth flow mocking
@@ -36,10 +36,36 @@ Client → FastMCP (stdio) → server.py → oslc.py → auth.py (cookies) → E
 
 - **Config**: env vars `ELM_URL`, `ELM_USER`, `ELM_PASSWORD` or `~/.elm_creds.json` (password base64-encoded)
 - **Auth**: Jazz form-based (`/jts/j_security_check`). Failure detected via `X-com-ibm-team-repository-web-auth-msg` header
-- **OSLC namespaces**: ELM 7.x uses v1 namespaces in rootservices (fallback to v2)
-- **Errors**: `ValueError` for user errors (bad domain, project not found). `RuntimeError` for auth failures
 - **SSL**: `verify=False` (internal certificates)
 - **Naming**: snake_case functions, PascalCase classes
+
+## Domain-Specific Patterns (ELM 7.0.3)
+
+Each ELM domain uses a different OSLC variant:
+
+| Domain | Catalog Namespace | Query Endpoint | Response Format |
+|--------|-------------------|----------------|-----------------|
+| **CCM** (RTC) | OSLC Core 2.0 | `/workitems/services` → QueryCapability → queryBase | JSON |
+| **RM** (DOORS Next) | Discovery 1.0 | `/views?oslc.query=true&projectURL=...` | JSON |
+| **QM** (ETM) | OSLC Core 2.0 | QueryCapability → queryBase | XML (406 on JSON) |
+
+### CCM Discovery
+```
+rootservices → oslc_cm_v1:cmServiceProviders → catalog (OSLC Core ServiceProvider with rdf:about)
+→ ServiceProvider URL + "/services" → QueryCapability → queryBase
+```
+
+### RM Discovery
+```
+rootservices → oslc_rm_v1:rmServiceProviders → catalog (Discovery 1.0 entries)
+→ services.xml URL → extract project_id → /views?oslc.query=true&projectURL=.../rm-projects/{id}
+```
+
+### QM Discovery
+```
+rootservices → oslc_qm_v1:qmServiceProviders → catalog (OSLC Core ServiceProvider)
+→ ServiceProvider URL + "/services" → QueryCapability → queryBase (XML response only)
+```
 
 ## Adding a New Tool
 
@@ -58,3 +84,4 @@ uv run ruff format --check src/ tests/
 ```
 
 Mock HTTP with `respx`. All tests are async (`asyncio_mode = "auto"`).
+Coverage excludes `cli.py` (interactive terminal code).

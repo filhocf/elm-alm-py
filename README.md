@@ -2,29 +2,31 @@
 
 MCP server for **IBM Engineering Lifecycle Management (ELM)** — read-only access to DOORS Next (RM), RTC (CCM), and ETM (QM) via OSLC REST APIs.
 
+Tested against ELM 7.0.3 (alm.dataprev.gov.br).
+
 ## Install
 
 ```bash
 uv pip install -e .
 ```
 
-Or with [uv](https://docs.astral.sh/uv/):
-
-```bash
-uv sync
-```
-
 ## Configuration
 
-Set environment variables:
+### Option 1: Interactive login (recommended)
 
 ```bash
-export ELM_URL=https://www-elm.prevnet
+elm-alm-py login
+```
+
+Saves credentials to `~/.elm_creds.json` (password base64-encoded, chmod 600).
+
+### Option 2: Environment variables
+
+```bash
+export ELM_URL=https://alm.dataprev.gov.br
 export ELM_USER=claudio.filho
 export ELM_PASSWORD=secret
 ```
-
-Or create a `.env` file in the project root.
 
 ## Usage
 
@@ -36,15 +38,13 @@ elm-alm-py
 
 ### MCP client configuration
 
-Add to your MCP client config (e.g. `~/.config/kiro/mcp.json`):
-
 ```json
 {
   "mcpServers": {
-    "elm": {
+    "elm-alm": {
       "command": "elm-alm-py",
       "env": {
-        "ELM_URL": "https://www-elm.prevnet",
+        "ELM_URL": "https://alm.dataprev.gov.br",
         "ELM_USER": "claudio.filho",
         "ELM_PASSWORD": "secret"
       }
@@ -71,14 +71,23 @@ The `query` parameter uses [OSLC query syntax](https://docs.oasis-open-projects.
 ```
 dcterms:title="My Requirement"
 dcterms:modified>="2024-01-01"
-oslc_rm:implementedBy{dcterms:title="Feature X"}
 ```
+
+## ELM 7.x Compatibility
+
+Each domain uses a different OSLC variant:
+
+| Domain | Application | API Pattern |
+|--------|-------------|-------------|
+| CCM | RTC (Work Items) | OSLC Core 2.0, JSON responses |
+| RM | DOORS Next (Requirements) | Discovery 1.0, /views endpoint |
+| QM | ETM (Test Cases) | OSLC Core 2.0, XML responses |
 
 ## Development
 
 ```bash
 uv sync --group dev
-uv run pytest tests/ -v
+uv run pytest tests/ -v --cov=elm_alm_py
 uv run ruff check src/ tests/
 ```
 
