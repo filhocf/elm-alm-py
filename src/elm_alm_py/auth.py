@@ -18,7 +18,7 @@ async def get_client() -> httpx.AsyncClient:
 
 async def _authenticate(client: httpx.AsyncClient) -> None:
     """Perform Jazz form-based authentication."""
-    auth_url = f"{settings.elm_url}/auth/j_security_check"
+    auth_url = f"{settings.elm_url}/jts/j_security_check"
     resp = await client.post(
         auth_url,
         data={"j_username": settings.elm_user, "j_password": settings.elm_password},

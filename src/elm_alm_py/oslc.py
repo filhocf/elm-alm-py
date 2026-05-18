@@ -7,13 +7,16 @@ import httpx
 from .auth import get_client
 from .config import settings
 
-# OSLC XML namespaces
+# OSLC XML namespaces (ELM 7.x uses OSLC 1.0 namespaces in rootservices)
 NS = {
     "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
     "oslc": "http://open-services.net/ns/core#",
     "oslc_rm": "http://open-services.net/ns/rm#",
     "oslc_cm": "http://open-services.net/ns/cm#",
     "oslc_qm": "http://open-services.net/ns/qm#",
+    "oslc_rm_v1": "http://open-services.net/xmlns/rm/1.0/",
+    "oslc_cm_v1": "http://open-services.net/xmlns/cm/1.0/",
+    "oslc_qm_v1": "http://open-services.net/xmlns/qm/1.0/",
     "dcterms": "http://purl.org/dc/terms/",
     "jfs": "http://jazz.net/xmlns/prod/jazz/jfs/1.0/",
 }
@@ -24,11 +27,11 @@ DOMAIN_PATHS = {
     "qm": "/qm/rootservices",
 }
 
-# Catalog discovery XPath per domain
+# Catalog discovery XPath per domain — try v1 namespace first (ELM 7.x), fallback to v2
 CATALOG_XPATH = {
-    "rm": ".//oslc_rm:rmServiceProviders",
-    "ccm": ".//oslc_cm:cmServiceProviders",
-    "qm": ".//oslc_qm:qmServiceProviders",
+    "rm": [".//oslc_rm_v1:rmServiceProviders", ".//oslc_rm:rmServiceProviders"],
+    "ccm": [".//oslc_cm_v1:cmServiceProviders", ".//oslc_cm:cmServiceProviders"],
+    "qm": [".//oslc_qm_v1:qmServiceProviders", ".//oslc_qm:qmServiceProviders"],
 }
 
 # Query capability resource types per domain
@@ -58,10 +61,11 @@ async def get_catalog_url(domain: str) -> str:
     client = await get_client()
     root_url = f"{settings.elm_url}{DOMAIN_PATHS[domain]}"
     root = await _get_xml(client, root_url)
-    elem = root.find(CATALOG_XPATH[domain], NS)
-    if elem is None:
-        raise ValueError(f"Cannot find service provider catalog for domain '{domain}'")
-    return elem.get(f"{{{NS['rdf']}}}resource")
+    for xpath in CATALOG_XPATH[domain]:
+        elem = root.find(xpath, NS)
+        if elem is not None:
+            return elem.get(f"{{{NS['rdf']}}}resource")
+    raise ValueError(f"Cannot find service provider catalog for domain '{domain}'")
 
 
 async def list_service_providers(domain: str) -> list[dict]:

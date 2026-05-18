@@ -15,7 +15,7 @@ async def cleanup():
 
 @respx.mock
 async def test_authenticate_success():
-    respx.post("https://www-elm.prevnet/auth/j_security_check").mock(return_value=httpx.Response(200))
+    respx.post("https://alm.dataprev.gov.br/jts/j_security_check").mock(return_value=httpx.Response(200))
     client = httpx.AsyncClient(verify=False)
     await _authenticate(client)
     await client.aclose()
@@ -23,7 +23,7 @@ async def test_authenticate_success():
 
 @respx.mock
 async def test_authenticate_failure():
-    respx.post("https://www-elm.prevnet/auth/j_security_check").mock(
+    respx.post("https://alm.dataprev.gov.br/jts/j_security_check").mock(
         return_value=httpx.Response(200, headers={"X-com-ibm-team-repository-web-auth-msg": "authfailed"})
     )
     client = httpx.AsyncClient(verify=False)
