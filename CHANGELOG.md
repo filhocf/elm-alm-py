@@ -3,7 +3,17 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-05-21
+
+### Added
+
+- **Write operations** for CCM work items:
+  - `create_workitem` — create task/story with parent, owner, description
+  - `update_workitem` — update title/description via OSLC PUT with ETag
+  - `add_child_workitem` — convenience wrapper for creating children
+- OSLC CreationFactory discovery for CCM domain
+- ETag-based optimistic locking on updates
+- Error handling tests for HTTP 400/401/409/412
 
 ### Fixed
 

@@ -63,6 +63,9 @@ elm-alm-py
 | `list_workitems(project, query?)` | OSLC query on CCM work items |
 | `get_workitem(id)` | Get single work item by ID |
 | `search_testcases(project, query?)` | OSLC query on QM test cases |
+| `create_workitem(project, title, type?, description?, parent_id?, owner?)` | Create a work item (task/story) |
+| `update_workitem(id, title?, description?)` | Update work item fields (ETag-based) |
+| `add_child_workitem(parent_id, title, type?, description?, owner?)` | Create a child work item |
 
 ### Query syntax
 

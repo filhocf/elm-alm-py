@@ -219,3 +219,83 @@ async def get_resource(uri: str) -> dict:
     """Fetch a single OSLC resource by URI."""
     client = await get_client()
     return await _get_json(client, uri)
+
+
+async def _find_creation_factory(domain: str, project_url: str) -> str:
+    """Find the OSLC CreationFactory URL for a project."""
+    client = await get_client()
+    resource_type = QUERY_RESOURCE_TYPE[domain]
+
+    urls_to_try = []
+    if project_url and not project_url.endswith("services.xml"):
+        urls_to_try = [project_url.rstrip("/") + "/services", project_url]
+    else:
+        urls_to_try = [project_url.replace("/services.xml", "/services"), project_url]
+
+    for url in urls_to_try:
+        try:
+            sp = await _get_xml(client, url)
+        except Exception:
+            continue
+        for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
+            rt_el = cf.find(f"{{{NS['oslc']}}}resourceType")
+            if rt_el is not None and rt_el.get(f"{{{NS['rdf']}}}resource") == resource_type:
+                creation = cf.find(f"{{{NS['oslc']}}}creation")
+                if creation is not None:
+                    return creation.get(f"{{{NS['rdf']}}}resource")
+        # Fallback: any creation factory
+        for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
+            creation = cf.find(f"{{{NS['oslc']}}}creation")
+            if creation is not None:
+                return creation.get(f"{{{NS['rdf']}}}resource")
+
+    raise ValueError(f"No creation factory found for {domain} in project '{project_url}'")
+
+
+async def create_resource(domain: str, project: str, payload: dict) -> dict:
+    """POST a new resource to the creation factory."""
+    if domain != "ccm":
+        raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
+    project_url = await _resolve_project_url(domain, project)
+    creation_url = await _find_creation_factory(domain, project_url)
+    client = await get_client()
+    resp = await client.post(
+        creation_url,
+        json=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "OSLC-Core-Version": "2.0",
+        },
+    )
+    if resp.status_code != 201:
+        resp.raise_for_status()
+        raise RuntimeError(f"Expected 201 Created, got {resp.status_code}")
+    return resp.json()
+
+
+async def update_resource(uri: str, payload: dict) -> dict:
+    """PUT updated fields to an existing resource (with ETag)."""
+    client = await get_client()
+    # GET full resource to obtain ETag and current state
+    get_resp = await client.get(uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+    get_resp.raise_for_status()
+    etag = get_resp.headers.get("ETag", "")
+    if not etag:
+        raise ValueError(f"Server did not return an ETag for resource '{uri}'. Cannot safely update.")
+    # Merge payload into full resource
+    current = get_resp.json()
+    merged = {**current, **payload}
+    # PUT with If-Match
+    resp = await client.put(
+        uri,
+        json=merged,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "OSLC-Core-Version": "2.0",
+            "If-Match": etag,
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()
