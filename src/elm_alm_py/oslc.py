@@ -254,6 +254,8 @@ async def _find_creation_factory(domain: str, project_url: str) -> str:
 
 async def create_resource(domain: str, project: str, payload: dict) -> dict:
     """POST a new resource to the creation factory."""
+    if domain != "ccm":
+        raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
     project_url = await _resolve_project_url(domain, project)
     creation_url = await _find_creation_factory(domain, project_url)
     client = await get_client()
@@ -266,21 +268,28 @@ async def create_resource(domain: str, project: str, payload: dict) -> dict:
             "OSLC-Core-Version": "2.0",
         },
     )
-    resp.raise_for_status()
+    if resp.status_code != 201:
+        resp.raise_for_status()
+        raise RuntimeError(f"Expected 201 Created, got {resp.status_code}")
     return resp.json()
 
 
 async def update_resource(uri: str, payload: dict) -> dict:
     """PUT updated fields to an existing resource (with ETag)."""
     client = await get_client()
-    # GET current resource to obtain ETag
+    # GET full resource to obtain ETag and current state
     get_resp = await client.get(uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
     get_resp.raise_for_status()
     etag = get_resp.headers.get("ETag", "")
+    if not etag:
+        raise ValueError(f"Server did not return an ETag for resource '{uri}'. Cannot safely update.")
+    # Merge payload into full resource
+    current = get_resp.json()
+    merged = {**current, **payload}
     # PUT with If-Match
     resp = await client.put(
         uri,
-        json=payload,
+        json=merged,
         headers={
             "Content-Type": "application/json",
             "Accept": "application/json",

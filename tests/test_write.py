@@ -142,3 +142,71 @@ async def test_create_workitem_invalid_type():
 async def test_update_workitem_no_fields():
     with pytest.raises(ValueError, match="At least one field"):
         await update_workitem(id="1")
+
+
+@respx.mock
+async def test_create_resource_post_400():
+    _mock_ccm_discovery()
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(400, text="Bad Request")
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+
+
+@respx.mock
+async def test_create_resource_post_401():
+    _mock_ccm_discovery()
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(401, text="Unauthorized")
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+
+
+@respx.mock
+async def test_update_resource_put_409():
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/99"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    respx.put(uri).mock(return_value=httpx.Response(409, text="Conflict"))
+    with pytest.raises(httpx.HTTPStatusError):
+        await oslc.update_resource(uri, {"dcterms:title": "X"})
+
+
+@respx.mock
+async def test_update_resource_put_412():
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/99"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    respx.put(uri).mock(return_value=httpx.Response(412, text="Precondition Failed"))
+    with pytest.raises(httpx.HTTPStatusError):
+        await oslc.update_resource(uri, {"dcterms:title": "X"})
+
+
+@respx.mock
+async def test_update_resource_no_etag():
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/99"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
+    with pytest.raises(ValueError, match="did not return an ETag"):
+        await oslc.update_resource(uri, {"dcterms:title": "X"})
+
+
+@respx.mock
+async def test_creation_factory_not_found():
+    _mock_auth()
+    respx.get(f"{BASE}/ccm/rootservices").mock(return_value=httpx.Response(200, text=CCM_ROOTSERVICES_XML))
+    respx.get(f"{BASE}/ccm/oslc/workitems/catalog").mock(return_value=httpx.Response(200, text=CCM_CATALOG_XML))
+    # Return services XML with no CreationFactory
+    empty_services = '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"></rdf:RDF>'
+    respx.get(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/services").mock(
+        return_value=httpx.Response(200, text=empty_services)
+    )
+    with pytest.raises(ValueError, match="No creation factory found"):
+        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+
+
+async def test_create_resource_non_ccm_domain():
+    with pytest.raises(NotImplementedError, match="only supports 'ccm'"):
+        await oslc.create_resource("rm", "SomeProject", {"dcterms:title": "X"})

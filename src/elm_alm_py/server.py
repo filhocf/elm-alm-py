@@ -68,10 +68,14 @@ async def create_workitem(
     """Create a work item in an RTC project via OSLC."""
     if type not in TYPE_IDS:
         raise ValueError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
+    # Resolve project URL and extract projectAreaId from it
+    project_url = await oslc._resolve_project_url("ccm", project)
+    # Pattern: /ccm/oslc/contexts/{projectAreaId}
+    project_area_id = project_url.rstrip("/").split("/")[-1]
     payload: dict = {
         "dcterms:title": title,
         "dcterms:type": "http://open-services.net/ns/cm#ChangeRequest",
-        "rtc_cm:type": {"rdf:resource": f"{settings.elm_url}/ccm/oslc/types/_MWxBEJB7Ee-fe_bes9r78g/{TYPE_IDS[type]}"},
+        "rtc_cm:type": {"rdf:resource": f"{settings.elm_url}/ccm/oslc/types/{project_area_id}/{TYPE_IDS[type]}"},
     }
     if description:
         payload["dcterms:description"] = description
@@ -92,9 +96,9 @@ async def update_workitem(
 ) -> dict:
     """Update fields of an existing work item via OSLC PUT."""
     payload: dict = {}
-    if title:
+    if title is not None:
         payload["dcterms:title"] = title
-    if description:
+    if description is not None:
         payload["dcterms:description"] = description
     if not payload:
         raise ValueError("At least one field (title, description) must be provided")
