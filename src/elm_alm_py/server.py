@@ -50,6 +50,78 @@ async def search_testcases(project: str, query: str | None = None) -> list[dict]
     return await oslc.query_resources("qm", project, query)
 
 
+TYPE_IDS = {
+    "task": "task",
+    "story": "com.ibm.team.apt.workItemType.story",
+}
+
+
+@mcp.tool()
+async def create_workitem(
+    project: str,
+    title: str,
+    type: str = "task",
+    description: str | None = None,
+    parent_id: str | None = None,
+    owner: str | None = None,
+) -> dict:
+    """Create a work item in an RTC project via OSLC."""
+    if type not in TYPE_IDS:
+        raise ValueError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
+    payload: dict = {
+        "dcterms:title": title,
+        "dcterms:type": "http://open-services.net/ns/cm#ChangeRequest",
+        "rtc_cm:type": {"rdf:resource": f"{settings.elm_url}/ccm/oslc/types/_MWxBEJB7Ee-fe_bes9r78g/{TYPE_IDS[type]}"},
+    }
+    if description:
+        payload["dcterms:description"] = description
+    if parent_id:
+        payload["rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent"] = [
+            {"rdf:resource": f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{parent_id}"}
+        ]
+    if owner:
+        payload["rtc_cm:ownedBy"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
+    return await oslc.create_resource("ccm", project, payload)
+
+
+@mcp.tool()
+async def update_workitem(
+    id: str,
+    title: str | None = None,
+    description: str | None = None,
+) -> dict:
+    """Update fields of an existing work item via OSLC PUT."""
+    payload: dict = {}
+    if title:
+        payload["dcterms:title"] = title
+    if description:
+        payload["dcterms:description"] = description
+    if not payload:
+        raise ValueError("At least one field (title, description) must be provided")
+    uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
+    return await oslc.update_resource(uri, payload)
+
+
+@mcp.tool()
+async def add_child_workitem(
+    parent_id: str,
+    title: str,
+    type: str = "task",
+    description: str | None = None,
+    owner: str | None = None,
+    project: str = "MEU IMOVEL RURAL (MIR)",
+) -> dict:
+    """Create a child work item under a parent in an RTC project."""
+    return await create_workitem(
+        project=project,
+        title=title,
+        type=type,
+        description=description,
+        parent_id=parent_id,
+        owner=owner,
+    )
+
+
 def main():
     """Entry point for the MCP server."""
     mcp.run(transport="stdio")
@@ -57,5 +129,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
