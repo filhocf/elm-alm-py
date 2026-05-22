@@ -292,18 +292,45 @@ async def _find_creation_factory(domain: str, project_url: str, wi_type: str | N
     raise ValueError(f"No creation factory found for {domain} in project '{project_url}'")
 
 
+def _payload_to_rdfxml(payload: dict) -> str:
+    """Convert a payload dict to RDF/XML format for OSLC resource creation."""
+    # Namespace prefixes used in payloads
+    ns_map = {
+        "dcterms": "http://purl.org/dc/terms/",
+        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "oslc_cm": "http://open-services.net/ns/cm#",
+        "rtc_cm": "http://jazz.net/xmlns/prod/jazz/rtc/cm/1.0/",
+        "rtc_ext": "http://jazz.net/xmlns/prod/jazz/rtc/ext/1.0/",
+    }
+    # Build namespace declarations
+    ns_decls = " ".join(f'xmlns:{p}="{u}"' for p, u in ns_map.items())
+    elements = []
+    for key, value in payload.items():
+        if isinstance(value, dict) and "rdf:resource" in value:
+            elements.append(f'  <{key} rdf:resource="{value["rdf:resource"]}"/>')
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and "rdf:resource" in item:
+                    elements.append(f'  <{key} rdf:resource="{item["rdf:resource"]}"/>')
+        else:
+            elements.append(f"  <{key}>{value}</{key}>")
+    body = "\n".join(elements)
+    return f"<rdf:RDF {ns_decls}>\n<oslc_cm:ChangeRequest>\n{body}\n</oslc_cm:ChangeRequest>\n</rdf:RDF>"
+
+
 async def create_resource(domain: str, project: str, payload: dict, wi_type: str | None = None) -> dict:
-    """POST a new resource to the creation factory."""
+    """POST a new resource (RDF/XML) to the creation factory."""
     if domain != "ccm":
         raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
     project_url = await _resolve_project_url(domain, project)
     creation_url = await _find_creation_factory(domain, project_url, wi_type=wi_type)
     client = await get_client()
+    rdfxml_body = _payload_to_rdfxml(payload)
     resp = await client.post(
         creation_url,
-        json=payload,
+        content=rdfxml_body,
         headers={
-            "Content-Type": "application/json",
+            "Content-Type": "application/rdf+xml",
             "Accept": "application/json",
             "OSLC-Core-Version": "2.0",
         },
