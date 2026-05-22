@@ -232,3 +232,111 @@ async def test_creation_factory_not_found():
 async def test_create_resource_non_ccm_domain():
     with pytest.raises(NotImplementedError, match="only supports 'ccm'"):
         await oslc.create_resource("rm", "SomeProject", {"dcterms:title": "X"})
+
+
+# --- Tests for custom_fields and _find_current_iteration ---
+
+
+ITERATIONS_JSON = {
+    "oslc:results": [
+        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter1", "dcterms:title": "Entrega 4", "rtc_cm:current": False},
+        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter2", "dcterms:title": "Entrega 5", "rtc_cm:current": True},
+        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter3", "dcterms:title": "Entrega 6", "rtc_cm:current": False},
+    ]
+}
+
+
+@respx.mock
+async def test_find_current_iteration_returns_current():
+    _mock_auth()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json=ITERATIONS_JSON)
+    )
+    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
+    result = await oslc._find_current_iteration(project_url)
+    assert result == f"{BASE}/ccm/oslc/iterations/_iter2"
+
+
+@respx.mock
+async def test_find_current_iteration_fallback_to_last():
+    _mock_auth()
+    no_current = {
+        "oslc:results": [
+            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_a", "dcterms:title": "Sprint 1"},
+            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_b", "dcterms:title": "Sprint 2"},
+        ]
+    }
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json=no_current)
+    )
+    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
+    result = await oslc._find_current_iteration(project_url)
+    assert result == f"{BASE}/ccm/oslc/iterations/_b"
+
+
+@respx.mock
+async def test_find_current_iteration_empty_returns_none():
+    _mock_auth()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
+    result = await oslc._find_current_iteration(project_url)
+    assert result is None
+
+
+@respx.mock
+async def test_find_current_iteration_http_error_returns_none():
+    _mock_auth()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(500, text="Server Error")
+    )
+    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
+    result = await oslc._find_current_iteration(project_url)
+    assert result is None
+
+
+@respx.mock
+async def test_create_workitem_with_custom_fields():
+    """custom_fields dict should be injected into the RDF/XML payload."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json=ITERATIONS_JSON)
+    )
+    # Capture the POST body to verify custom fields are included
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    result = await create_workitem(
+        project="MEU IMOVEL RURAL (MIR)",
+        title="Test Task",
+        type="task",
+        custom_fields={"rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": "literal.l10"},
+    )
+    assert result["dcterms:identifier"] == "42"
+    # Verify custom field is in the posted body
+    posted_body = post_route.calls[0].request.content.decode()
+    assert "categoriatarefa" in posted_body
+    assert "literal.l10" in posted_body
+
+
+@respx.mock
+async def test_create_workitem_without_custom_fields():
+    """Without custom_fields, no extra fields should be injected."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json=ITERATIONS_JSON)
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    result = await create_workitem(
+        project="MEU IMOVEL RURAL (MIR)",
+        title="Test Task",
+        type="task",
+    )
+    assert result["dcterms:identifier"] == "42"
+    # plannedFor should still be auto-discovered
+    posted_body = post_route.calls[0].request.content.decode()
+    assert "plannedFor" in posted_body
+    assert "_iter2" in posted_body

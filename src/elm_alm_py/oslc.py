@@ -245,6 +245,29 @@ async def _find_default_category(project_url: str) -> str | None:
     return None
 
 
+async def _find_current_iteration(project_url: str) -> str | None:
+    """Discover the current iteration (plannedFor) for a CCM project area."""
+    client = await get_client()
+    project_area_id = project_url.rstrip("/").split("/")[-1]
+    iterations_url = f"{settings.elm_url}/ccm/oslc/iterations?projectArea={project_area_id}"
+    try:
+        resp = await client.get(
+            iterations_url,
+            headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        members = data.get("oslc:results", data.get("rdfs:member", []))
+        if members and isinstance(members, list):
+            for m in members:
+                if m.get("rtc_cm:current", False):
+                    return m.get("rdf:about", m.get("rdf:resource"))
+            return members[-1].get("rdf:about", members[-1].get("rdf:resource"))
+    except Exception:
+        pass
+    return None
+
+
 async def _find_creation_factory(domain: str, project_url: str, wi_type: str | None = None) -> str:
     """Find the OSLC CreationFactory URL for a project, optionally filtering by work item type."""
     client = await get_client()

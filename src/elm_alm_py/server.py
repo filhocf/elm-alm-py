@@ -65,13 +65,23 @@ async def create_workitem(
     parent_id: str | None = None,
     owner: str | None = None,
     filed_against: str | None = None,
+    custom_fields: dict | None = None,
 ) -> dict:
-    """Create a work item in an RTC project via OSLC."""
+    """Create a work item in an RTC project via OSLC.
+
+    Args:
+        project: Project name (e.g., "MEU IMOVEL RURAL (MIR)")
+        title: Work item title (required)
+        type: "task" or "story" (default: "task")
+        description: HTML description (optional)
+        parent_id: Parent work item ID (optional)
+        owner: Username of the owner (optional, e.g., "claudio.filho")
+        filed_against: Category URI (optional). If not provided, discovers default from project.
+        custom_fields: Dict of extra RDF fields to inject (e.g., {"rtc_ext:campo": "valor"})
+    """
     if type not in TYPE_IDS:
         raise ValueError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
-    # Resolve project URL and extract projectAreaId from it
     project_url = await oslc._resolve_project_url("ccm", project)
-    # Pattern: /ccm/oslc/contexts/{projectAreaId}
     project_area_id = project_url.rstrip("/").split("/")[-1]
     payload: dict = {
         "dcterms:title": title,
@@ -86,11 +96,17 @@ async def create_workitem(
         ]
     if owner:
         payload["rtc_cm:ownedBy"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
-    # Auto-discover default category if not provided
     if not filed_against:
         filed_against = await oslc._find_default_category(project_url)
     if filed_against:
         payload["rtc_cm:filedAgainst"] = {"rdf:resource": filed_against}
+    # Auto-discover current iteration
+    planned_for = await oslc._find_current_iteration(project_url)
+    if planned_for:
+        payload["rtc_cm:plannedFor"] = {"rdf:resource": planned_for}
+    # Inject custom fields (project-specific customizations)
+    if custom_fields:
+        payload.update(custom_fields)
     return await oslc.create_resource("ccm", project, payload, wi_type=type)
 
 
