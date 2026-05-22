@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "elm-alm-py"
-version = "0.2.1"
+version = "0.3.0"
 description = "MCP server for IBM Engineering Lifecycle Management (ELM) via OSLC REST API"
 readme = "README.md"
 license = "MIT"
