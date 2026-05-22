@@ -171,7 +171,9 @@ async def update_workitem(
     if description is not None:
         payload["dcterms:description"] = description
     if owner is not None:
-        payload["dcterms:contributor"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
+        from urllib.parse import quote
+
+        payload["dcterms:contributor"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{quote(owner)}"}
     if estimate_hours is not None:
         payload["rtc_cm:estimate"] = int(estimate_hours * 3600000)
     if planned_for is not None:

@@ -139,7 +139,7 @@ uv run ruff check src/ tests/
 ## Known Limitations
 
 - `_find_default_category` returns first category from list (may not be correct for your project). Use `filed_against` parameter explicitly.
-- `update_workitem` currently only supports `title` and `description`. Use direct API for other fields (see CdIA docs).
+- `update_workitem` supports title, description, owner, estimate_hours, planned_for, and custom_fields.
 - OSLC CM 1.0 services.xml parsing is bypassed — creation URL is constructed directly.
 
 ## License

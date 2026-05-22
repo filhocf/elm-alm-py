@@ -240,8 +240,10 @@ async def _find_default_category(project_url: str) -> str | None:
             first = members[0]
             # Return the rdf:about URI of the category
             return first.get("rdf:about", first.get("rdf:resource"))
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).debug("Iteration discovery failed: %s", exc)
     return None
 
 
@@ -287,8 +289,10 @@ async def _find_current_iteration(project_url: str) -> str | None:
             candidates.sort(key=lambda x: (x[2], x[1]), reverse=True)
             return candidates[0][0]
         return None
-    except Exception:
-        pass
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).debug("Iteration discovery failed: %s", exc)
     return None
 
 
