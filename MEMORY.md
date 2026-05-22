@@ -4,7 +4,7 @@
 
 - **Versão**: 0.1.0 (10 commits, branch main)
 - **Repo**: https://github.com/filhocf/elm-alm-py
-- **Status**: ✅ Testado end-to-end contra ELM real (alm.dataprev.gov.br)
+- **Status**: ✅ Testado end-to-end contra ELM real
 
 ## Feito
 
@@ -47,4 +47,4 @@
 - RM usa /views endpoint (Discovery 1.0, não OSLC Core QueryCapability)
 - QM aceita só XML (fallback automático quando JSON dá 406)
 - Coverage threshold 60% (cli.py excluído, código novo testado e2e)
-- URL: https://alm.dataprev.gov.br (internet pública, não precisa VPN)
+- ELM URL configured via env var or ~/.elm_creds.json (no hardcoded default)

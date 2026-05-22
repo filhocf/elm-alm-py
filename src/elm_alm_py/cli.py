@@ -9,12 +9,14 @@ import sys
 import httpx
 
 CRED_FILE = os.path.expanduser("~/.elm_creds.json")
-DEFAULT_URL = "https://alm.dataprev.gov.br"
 
 
 def login():
     """Authenticate to ELM and save credentials."""
-    url = input(f"ELM URL [{DEFAULT_URL}]: ").strip() or DEFAULT_URL
+    url = input("ELM URL (e.g. https://elm.example.com): ").strip()
+    if not url:
+        print("❌ ELM URL is required.")
+        sys.exit(1)
     username = input("Usuário ELM (LDAP): ").strip()
     password = getpass.getpass("Senha ELM: ")
 
@@ -45,11 +47,10 @@ def login():
 
     # Save credentials
     creds = {
+        "url": url,
         "username": username,
         "password": base64.b64encode(password.encode()).decode(),
     }
-    if url != DEFAULT_URL:
-        creds["url"] = url
 
     with open(CRED_FILE, "w") as f:
         json.dump(creds, f, indent=2)

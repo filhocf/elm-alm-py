@@ -2,7 +2,7 @@
 
 MCP server for **IBM Engineering Lifecycle Management (ELM)** — read-only access to DOORS Next (RM), RTC (CCM), and ETM (QM) via OSLC REST APIs.
 
-Tested against ELM 7.0.3 (alm.dataprev.gov.br).
+Tested against ELM 7.0.3.
 
 ## Install
 
@@ -23,8 +23,8 @@ Saves credentials to `~/.elm_creds.json` (password base64-encoded, chmod 600).
 ### Option 2: Environment variables
 
 ```bash
-export ELM_URL=https://alm.dataprev.gov.br
-export ELM_USER=claudio.filho
+export ELM_URL=https://your-elm-server.example.com
+export ELM_USER=your_username
 export ELM_PASSWORD=secret
 ```
 
@@ -44,8 +44,8 @@ elm-alm-py
     "elm-alm": {
       "command": "elm-alm-py",
       "env": {
-        "ELM_URL": "https://alm.dataprev.gov.br",
-        "ELM_USER": "claudio.filho",
+        "ELM_URL": "https://your-elm-server.example.com",
+        "ELM_USER": "your_username",
         "ELM_PASSWORD": "secret"
       }
     }

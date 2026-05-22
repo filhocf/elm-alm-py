@@ -31,7 +31,7 @@ def _decode_password(value: str) -> str:
 
 
 class Settings(BaseSettings):
-    elm_url: str = "https://alm.dataprev.gov.br"
+    elm_url: str = ""
     elm_user: str = ""
     elm_password: str = ""
 
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
             if creds:
                 object.__setattr__(self, "elm_user", creds.get("username", ""))
                 object.__setattr__(self, "elm_password", _decode_password(creds.get("password", "")))
-                if not self.elm_url or self.elm_url == "https://alm.dataprev.gov.br":
+                if not self.elm_url:
                     url = creds.get("url")
                     if url:
                         object.__setattr__(self, "elm_url", url)

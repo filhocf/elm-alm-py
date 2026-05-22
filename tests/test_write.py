@@ -8,7 +8,7 @@ from elm_alm_py import oslc
 from elm_alm_py.auth import close_client
 from elm_alm_py.server import create_workitem, update_workitem, add_child_workitem
 
-BASE = "https://alm.dataprev.gov.br"
+BASE = "https://elm.example.com"
 
 CCM_ROOTSERVICES_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rdf:Description xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
@@ -46,7 +46,8 @@ CREATED_WI = {
 
 
 @pytest.fixture(autouse=True)
-async def cleanup():
+async def cleanup(monkeypatch):
+    monkeypatch.setattr("elm_alm_py.config.settings.elm_url", BASE)
     yield
     await close_client()
 

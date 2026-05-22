@@ -9,7 +9,7 @@ Adicionar tools de escrita ao elm-alm-py para criar e atualizar work items no RT
 - Repo: ~/git/elm-alm-py
 - Branch: criar `feat/write-workitems` a partir de `main`
 - Padrão: seguir AGENTS.md (FastMCP tool, lógica em oslc.py, testes com respx)
-- ELM 7.0.3 em https://alm.dataprev.gov.br
+- ELM 7.0.3 (configured via ELM_URL env var or ~/.elm_creds.json)
 - Projeto alvo: "MEU IMOVEL RURAL (MIR)" (project area ID: `_MWxBEJB7Ee-fe_bes9r78g`)
 
 ## Tools a implementar
@@ -37,9 +37,9 @@ Cria um work item no RTC via OSLC POST.
      "dcterms:title": "título",
      "dcterms:description": "descrição",
      "dcterms:type": "http://open-services.net/ns/cm#ChangeRequest",
-     "rtc_cm:type": {"rdf:resource": "https://alm.dataprev.gov.br/ccm/oslc/types/{projectAreaId}/{typeId}"},
+     "rtc_cm:type": {"rdf:resource": "{elm_url}/ccm/oslc/types/{projectAreaId}/{typeId}"},
      "rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.parent": [
-       {"rdf:resource": "https://alm.dataprev.gov.br/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{parent_id}"}
+       {"rdf:resource": "{elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{parent_id}"}
      ]
    }
    ```

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP server providing read-only access to IBM Engineering Lifecycle Management (ELM) via OSLC REST APIs. Covers DOORS Next (RM), RTC (CCM), and ETM (QM) domains with form-based Jazz authentication. Tested against ELM 7.0.3 at alm.dataprev.gov.br.
+MCP server providing read-only access to IBM Engineering Lifecycle Management (ELM) via OSLC REST APIs. Covers DOORS Next (RM), RTC (CCM), and ETM (QM) domains with form-based Jazz authentication. Tested against ELM 7.0.3.
 
 ## Architecture
 
