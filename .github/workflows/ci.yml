@@ -32,3 +32,12 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --group dev
       - run: uv run pytest tests/ -v --tb=short --cov=elm_alm_py --cov-report=term-missing --cov-fail-under=60
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Security check (bandit)
+        run: |
+          pip install bandit
+          bandit -r src/ -ll -ii --skip B501,B314
