@@ -57,6 +57,38 @@ TYPE_IDS = {
 
 
 @mcp.tool()
+async def list_iterations(project: str) -> list[dict]:
+    """List iterations (sprints/releases) for an RTC project with title and dates."""
+    project_url = await oslc._resolve_project_url("ccm", project)
+    parts = project_url.split("/contexts/")
+    project_area_id = parts[1].split("/")[0] if len(parts) > 1 else project_url.rstrip("/").split("/")[-1]
+    client = await oslc.get_client()
+    url = f"{settings.elm_url}/ccm/oslc/iterations?projectArea={project_area_id}"
+    resp = await client.get(url, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+    resp.raise_for_status()
+    results = resp.json().get("oslc:results", [])
+    iterations = []
+    for r in results:
+        iter_uri = r.get("rdf:resource")
+        if not iter_uri:
+            continue
+        detail = await client.get(iter_uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+        if detail.status_code != 200:
+            continue
+        d = detail.json()
+        iterations.append(
+            {
+                "title": d.get("dcterms:title", ""),
+                "identifier": d.get("dcterms:identifier", ""),
+                "start_date": (d.get("rtc_cm:startDate") or "")[:10] or None,
+                "end_date": (d.get("rtc_cm:endDate") or "")[:10] or None,
+                "uri": iter_uri,
+            }
+        )
+    return iterations
+
+
+@mcp.tool()
 async def create_workitem(
     project: str,
     title: str,
@@ -117,15 +149,39 @@ async def update_workitem(
     id: str,
     title: str | None = None,
     description: str | None = None,
+    owner: str | None = None,
+    estimate_hours: float | None = None,
+    planned_for: str | None = None,
+    custom_fields: dict | None = None,
 ) -> dict:
-    """Update fields of an existing work item via OSLC PUT."""
+    """Update fields of an existing work item via OSLC PUT.
+
+    Args:
+        id: Work item ID (number)
+        title: New title (optional)
+        description: New description (optional)
+        owner: Username to assign (e.g., "claudio.filho")
+        estimate_hours: Estimate in hours (e.g., 8 = 8h)
+        planned_for: Iteration URI (e.g., from get_workitem response)
+        custom_fields: Dict of extra fields to merge into PUT payload
+    """
     payload: dict = {}
     if title is not None:
         payload["dcterms:title"] = title
     if description is not None:
         payload["dcterms:description"] = description
+    if owner is not None:
+        from urllib.parse import quote
+
+        payload["dcterms:contributor"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{quote(owner)}"}
+    if estimate_hours is not None:
+        payload["rtc_cm:estimate"] = int(estimate_hours * 3600000)
+    if planned_for is not None:
+        payload["rtc_cm:plannedFor"] = {"rdf:resource": planned_for}
+    if custom_fields:
+        payload.update(custom_fields)
     if not payload:
-        raise ValueError("At least one field (title, description) must be provided")
+        raise ValueError("At least one field must be provided")
     uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
     return await oslc.update_resource(uri, payload)
 

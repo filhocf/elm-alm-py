@@ -237,47 +237,86 @@ async def test_create_resource_non_ccm_domain():
 
 ITERATIONS_JSON = {
     "oslc:results": [
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter1", "dcterms:title": "Entrega 4", "rtc_cm:current": False},
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter2", "dcterms:title": "Entrega 5", "rtc_cm:current": True},
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter3", "dcterms:title": "Entrega 6", "rtc_cm:current": False},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter1"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter2"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter3"},
     ]
 }
+
+ITER_DETAIL_1 = {
+    "dcterms:title": "Entrega 4",
+    "rtc_cm:startDate": "2026-04-01T00:00:00.000Z",
+    "rtc_cm:endDate": "2026-04-30T00:00:00.000Z",
+}
+ITER_DETAIL_2 = {
+    "dcterms:title": "Sprint 2",
+    "rtc_cm:startDate": "2026-05-01T00:00:00.000Z",
+    "rtc_cm:endDate": "2026-12-31T00:00:00.000Z",
+}
+ITER_DETAIL_3 = {
+    "dcterms:title": "Entrega 6",
+    "rtc_cm:startDate": "2027-01-01T00:00:00.000Z",
+    "rtc_cm:endDate": "2027-06-30T00:00:00.000Z",
+}
+
+
+def _mock_iteration_details():
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter1").mock(return_value=httpx.Response(200, json=ITER_DETAIL_1))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter2").mock(return_value=httpx.Response(200, json=ITER_DETAIL_2))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter3").mock(return_value=httpx.Response(200, json=ITER_DETAIL_3))
 
 
 @respx.mock
 async def test_find_current_iteration_returns_current():
     _mock_auth()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=ITERATIONS_JSON)
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=ITERATIONS_JSON))
+    _mock_iteration_details()
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
+    # _iter2 has date range that includes "now" (2026-05-01 to 2026-12-31)
     assert result == f"{BASE}/ccm/oslc/iterations/_iter2"
 
 
 @respx.mock
-async def test_find_current_iteration_fallback_to_last():
+async def test_find_current_iteration_fallback_returns_none_if_all_past():
+    """If no iteration contains 'now', return None."""
     _mock_auth()
-    no_current = {
+    past_iters = {
         "oslc:results": [
-            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_a", "dcterms:title": "Sprint 1"},
-            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_b", "dcterms:title": "Sprint 2"},
+            {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_a"},
+            {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_b"},
         ]
     }
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=no_current)
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=past_iters))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_a").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "dcterms:title": "Old 1",
+                "rtc_cm:startDate": "2024-01-01T00:00:00.000Z",
+                "rtc_cm:endDate": "2024-06-30T00:00:00.000Z",
+            },
+        )
+    )
+    respx.get(f"{BASE}/ccm/oslc/iterations/_b").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "dcterms:title": "Old 2",
+                "rtc_cm:startDate": "2024-07-01T00:00:00.000Z",
+                "rtc_cm:endDate": "2024-12-31T00:00:00.000Z",
+            },
+        )
     )
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
-    assert result == f"{BASE}/ccm/oslc/iterations/_b"
+    assert result is None
 
 
 @respx.mock
 async def test_find_current_iteration_empty_returns_none():
     _mock_auth()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
     assert result is None
@@ -286,9 +325,7 @@ async def test_find_current_iteration_empty_returns_none():
 @respx.mock
 async def test_find_current_iteration_http_error_returns_none():
     _mock_auth()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(500, text="Server Error")
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(500, text="Server Error"))
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
     assert result is None
@@ -298,9 +335,7 @@ async def test_find_current_iteration_http_error_returns_none():
 async def test_create_workitem_with_custom_fields():
     """custom_fields dict should be injected into the RDF/XML payload."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=ITERATIONS_JSON)
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     # Capture the POST body to verify custom fields are included
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
@@ -320,11 +355,9 @@ async def test_create_workitem_with_custom_fields():
 
 @respx.mock
 async def test_create_workitem_without_custom_fields():
-    """Without custom_fields, no extra fields should be injected."""
+    """Without custom_fields, no extra fields should be injected. plannedFor only if iteration found."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=ITERATIONS_JSON)
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
@@ -334,10 +367,9 @@ async def test_create_workitem_without_custom_fields():
         type="task",
     )
     assert result["dcterms:identifier"] == "42"
-    # plannedFor should still be auto-discovered
+    # No iterations available → no plannedFor in payload
     posted_body = post_route.calls[0].request.content.decode()
-    assert "plannedFor" in posted_body
-    assert "_iter2" in posted_body
+    assert "plannedFor" not in posted_body
 
 
 # === GOLDEN PAYLOAD TESTS (based on real server validation 22/mai/2026) ===
@@ -353,16 +385,12 @@ ITERATION_OID = "_361O8T5XEfGJQth8TJaPLA"
 async def test_golden_creation_url_is_workitems_not_defect():
     """Factory URL must be /workitems (not /workitems or /workitems/task)."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     # The POST must go to /workitems — NOT /workitems
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await create_workitem(
-        project="MEU IMOVEL RURAL (MIR)", title="Test", type="task"
-    )
+    result = await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
     assert result["dcterms:identifier"] == "42"
     assert post_route.called
 
@@ -371,9 +399,7 @@ async def test_golden_creation_url_is_workitems_not_defect():
 async def test_golden_content_type_is_rdf_xml():
     """POST Content-Type must be application/rdf+xml."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
@@ -392,13 +418,16 @@ async def test_golden_category_uses_itemoid_format():
     )
     # Category API must return itemOid format
     respx.get(f"{BASE}/ccm/oslc/categories").mock(
-        return_value=httpx.Response(200, json={
-            "oslc:results": [{"rdf:about": f"{BASE}/ccm/resource/itemOid/com.ibm.team.workitem.Category/{CATEGORY_OID}"}]
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "oslc:results": [
+                    {"rdf:about": f"{BASE}/ccm/resource/itemOid/com.ibm.team.workitem.Category/{CATEGORY_OID}"}
+                ]
+            },
+        )
     )
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
@@ -411,9 +440,7 @@ async def test_golden_category_uses_itemoid_format():
 async def test_golden_custom_fields_as_rdf_resource():
     """custom_fields with rdf:resource values must render as rdf:resource attributes in XML."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
@@ -437,9 +464,7 @@ async def test_golden_custom_fields_as_rdf_resource():
 async def test_golden_type_id_is_task_not_requirementchangerequest():
     """rtc_cm:type URI must use 'task' (not 'requirementChangeRequest' which is the calm:id)."""
     _mock_ccm_discovery()
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={"oslc:results": []})
-    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
@@ -453,11 +478,20 @@ async def test_golden_plannedfor_iteration_format():
     """plannedFor must use /oslc/iterations/{iterationOid} (without projectAreaId in path)."""
     _mock_ccm_discovery()
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json={
-            "oslc:results": [
-                {"rdf:about": f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}", "rtc_cm:current": True}
-            ]
-        })
+        return_value=httpx.Response(
+            200, json={"oslc:results": [{"rdf:resource": f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}"}]}
+        )
+    )
+    # Mock iteration detail with current date range
+    respx.get(f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "dcterms:title": "Sprint 2",
+                "rtc_cm:startDate": "2026-01-01T00:00:00.000Z",
+                "rtc_cm:endDate": "2027-12-31T00:00:00.000Z",
+            },
+        )
     )
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
@@ -465,3 +499,125 @@ async def test_golden_plannedfor_iteration_format():
     await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
     body = post_route.calls[0].request.content.decode()
     assert f"/oslc/iterations/{ITERATION_OID}" in body
+
+
+# === #20: update_workitem expanded (owner, planned_for, estimate_hours, custom_fields) ===
+
+
+@respx.mock
+async def test_update_workitem_owner():
+    """owner parameter must set dcterms:contributor with rdf:resource."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    updated = {**CREATED_WI, "dcterms:contributor": {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    result = await update_workitem(id="42", owner="claudio.filho")
+    assert result["dcterms:contributor"]["rdf:resource"] == f"{BASE}/jts/users/claudio.filho"
+    body = put_route.calls[0].request.content
+    import json as _json
+
+    sent = _json.loads(body)
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+
+
+@respx.mock
+async def test_update_workitem_estimate_hours():
+    """estimate_hours must set rtc_cm:estimate in milliseconds."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    updated = {**CREATED_WI, "rtc_cm:estimate": 28800000}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    await update_workitem(id="42", estimate_hours=8)
+    body = put_route.calls[0].request.content
+    import json as _json
+
+    sent = _json.loads(body)
+    assert sent["rtc_cm:estimate"] == 28800000  # 8h * 3600000
+
+
+@respx.mock
+async def test_update_workitem_planned_for():
+    """planned_for must set rtc_cm:plannedFor with rdf:resource."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    iteration_uri = f"{BASE}/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA"
+    updated = {**CREATED_WI, "rtc_cm:plannedFor": {"rdf:resource": iteration_uri}}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    await update_workitem(id="42", planned_for=iteration_uri)
+    body = put_route.calls[0].request.content
+    import json as _json
+
+    sent = _json.loads(body)
+    assert sent["rtc_cm:plannedFor"] == {"rdf:resource": iteration_uri}
+
+
+@respx.mock
+async def test_update_workitem_custom_fields():
+    """custom_fields dict must be merged into the PUT payload."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    respx.put(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
+    await update_workitem(id="42", custom_fields={"rtc_cm:someField": "value"})
+
+
+@respx.mock
+async def test_update_workitem_multiple_fields():
+    """Multiple fields can be updated in a single call."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
+    await update_workitem(id="42", title="New Title", owner="claudio.filho", estimate_hours=16)
+    body = put_route.calls[0].request.content
+    import json as _json
+
+    sent = _json.loads(body)
+    assert sent["dcterms:title"] == "New Title"
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+    assert sent["rtc_cm:estimate"] == 57600000
+
+
+# === #11: list_iterations tool ===
+
+ITERATIONS_LIST_JSON = {
+    "oslc:results": [
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter1"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter2"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter3"},
+    ]
+}
+
+ITER1_JSON = {"dcterms:title": "Backlog", "dcterms:identifier": "Backlog"}
+ITER2_JSON = {
+    "dcterms:title": "Sprint 1",
+    "dcterms:identifier": "Sprint 1",
+    "rtc_cm:startDate": "2026-05-01T00:00:00.000Z",
+    "rtc_cm:endDate": "2026-05-15T00:00:00.000Z",
+}
+ITER3_JSON = {
+    "dcterms:title": "Sprint 2",
+    "dcterms:identifier": "Sprint 2",
+    "rtc_cm:startDate": "2026-05-18T00:00:00.000Z",
+    "rtc_cm:endDate": "2026-06-06T00:00:00.000Z",
+}
+
+
+@respx.mock
+async def test_list_iterations():
+    """list_iterations must return iterations with title, dates, and URI."""
+    from elm_alm_py.server import list_iterations
+
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=ITERATIONS_LIST_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter1").mock(return_value=httpx.Response(200, json=ITER1_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter2").mock(return_value=httpx.Response(200, json=ITER2_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter3").mock(return_value=httpx.Response(200, json=ITER3_JSON))
+    result = await list_iterations(project="MEU IMOVEL RURAL (MIR)")
+    assert len(result) == 3
+    assert result[1]["title"] == "Sprint 1"
+    assert result[1]["start_date"] == "2026-05-01"
+    assert result[1]["uri"] == f"{BASE}/ccm/oslc/iterations/_iter2"
