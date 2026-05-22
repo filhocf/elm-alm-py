@@ -57,6 +57,36 @@ TYPE_IDS = {
 
 
 @mcp.tool()
+async def list_iterations(project: str) -> list[dict]:
+    """List iterations (sprints/releases) for an RTC project with title and dates."""
+    project_url = await oslc._resolve_project_url("ccm", project)
+    parts = project_url.split("/contexts/")
+    project_area_id = parts[1].split("/")[0] if len(parts) > 1 else project_url.rstrip("/").split("/")[-1]
+    client = await oslc.get_client()
+    url = f"{settings.elm_url}/ccm/oslc/iterations?projectArea={project_area_id}"
+    resp = await client.get(url, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+    resp.raise_for_status()
+    results = resp.json().get("oslc:results", [])
+    iterations = []
+    for r in results:
+        iter_uri = r.get("rdf:resource")
+        if not iter_uri:
+            continue
+        detail = await client.get(iter_uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+        if detail.status_code != 200:
+            continue
+        d = detail.json()
+        iterations.append({
+            "title": d.get("dcterms:title", ""),
+            "identifier": d.get("dcterms:identifier", ""),
+            "start_date": (d.get("rtc_cm:startDate") or "")[:10] or None,
+            "end_date": (d.get("rtc_cm:endDate") or "")[:10] or None,
+            "uri": iter_uri,
+        })
+    return iterations
+
+
+@mcp.tool()
 async def create_workitem(
     project: str,
     title: str,

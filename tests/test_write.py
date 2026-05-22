@@ -541,3 +541,34 @@ async def test_update_workitem_multiple_fields():
     assert sent["dcterms:title"] == "New Title"
     assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
     assert sent["rtc_cm:estimate"] == 57600000
+
+
+# === #11: list_iterations tool ===
+
+ITERATIONS_LIST_JSON = {
+    "oslc:results": [
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter1"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter2"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter3"},
+    ]
+}
+
+ITER1_JSON = {"dcterms:title": "Backlog", "dcterms:identifier": "Backlog"}
+ITER2_JSON = {"dcterms:title": "Sprint 1", "dcterms:identifier": "Sprint 1", "rtc_cm:startDate": "2026-05-01T00:00:00.000Z", "rtc_cm:endDate": "2026-05-15T00:00:00.000Z"}
+ITER3_JSON = {"dcterms:title": "Sprint 2", "dcterms:identifier": "Sprint 2", "rtc_cm:startDate": "2026-05-18T00:00:00.000Z", "rtc_cm:endDate": "2026-06-06T00:00:00.000Z"}
+
+
+@respx.mock
+async def test_list_iterations():
+    """list_iterations must return iterations with title, dates, and URI."""
+    from elm_alm_py.server import list_iterations
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=ITERATIONS_LIST_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter1").mock(return_value=httpx.Response(200, json=ITER1_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter2").mock(return_value=httpx.Response(200, json=ITER2_JSON))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter3").mock(return_value=httpx.Response(200, json=ITER3_JSON))
+    result = await list_iterations(project="MEU IMOVEL RURAL (MIR)")
+    assert len(result) == 3
+    assert result[1]["title"] == "Sprint 1"
+    assert result[1]["start_date"] == "2026-05-01"
+    assert result[1]["uri"] == f"{BASE}/ccm/oslc/iterations/_iter2"
