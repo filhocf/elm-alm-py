@@ -512,7 +512,7 @@ async def test_update_workitem_estimate_hours():
     respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
     updated = {**CREATED_WI, "rtc_cm:estimate": 28800000}
     put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
-    result = await update_workitem(id="42", estimate_hours=8)
+    await update_workitem(id="42", estimate_hours=8)
     body = put_route.calls[0].request.content
     import json as _json
     sent = _json.loads(body)
@@ -528,7 +528,7 @@ async def test_update_workitem_planned_for():
     iteration_uri = f"{BASE}/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA"
     updated = {**CREATED_WI, "rtc_cm:plannedFor": {"rdf:resource": iteration_uri}}
     put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
-    result = await update_workitem(id="42", planned_for=iteration_uri)
+    await update_workitem(id="42", planned_for=iteration_uri)
     body = put_route.calls[0].request.content
     import json as _json
     sent = _json.loads(body)
