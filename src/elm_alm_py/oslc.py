@@ -275,7 +275,7 @@ async def _find_creation_factory(domain: str, project_url: str, wi_type: str | N
             # If a specific type is requested, check title match
             if wi_type:
                 title_el = cf.find(f"{{{NS['dcterms']}}}title")
-                if title_el is not None and wi_type.lower() in title_el.text.lower():
+                if title_el is not None and title_el.text and wi_type.lower() in title_el.text.lower():
                     return factory_url
             if generic_factory is None:
                 generic_factory = factory_url
@@ -313,7 +313,8 @@ def _payload_to_rdfxml(payload: dict) -> str:
                 if isinstance(item, dict) and "rdf:resource" in item:
                     elements.append(f'  <{key} rdf:resource="{item["rdf:resource"]}"/>')
         else:
-            elements.append(f"  <{key}>{value}</{key}>")
+            from xml.sax.saxutils import escape
+            elements.append(f"  <{key}>{escape(str(value))}</{key}>")
     body = "\n".join(elements)
     return f"<rdf:RDF {ns_decls}>\n<oslc_cm:ChangeRequest>\n{body}\n</oslc_cm:ChangeRequest>\n</rdf:RDF>"
 
