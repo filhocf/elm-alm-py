@@ -76,13 +76,15 @@ async def list_iterations(project: str) -> list[dict]:
         if detail.status_code != 200:
             continue
         d = detail.json()
-        iterations.append({
-            "title": d.get("dcterms:title", ""),
-            "identifier": d.get("dcterms:identifier", ""),
-            "start_date": (d.get("rtc_cm:startDate") or "")[:10] or None,
-            "end_date": (d.get("rtc_cm:endDate") or "")[:10] or None,
-            "uri": iter_uri,
-        })
+        iterations.append(
+            {
+                "title": d.get("dcterms:title", ""),
+                "identifier": d.get("dcterms:identifier", ""),
+                "start_date": (d.get("rtc_cm:startDate") or "")[:10] or None,
+                "end_date": (d.get("rtc_cm:endDate") or "")[:10] or None,
+                "uri": iter_uri,
+            }
+        )
     return iterations
 
 

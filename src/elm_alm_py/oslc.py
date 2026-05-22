@@ -361,6 +361,7 @@ def _payload_to_rdfxml(payload: dict) -> str:
                     elements.append(f'  <{key} rdf:resource="{item["rdf:resource"]}"/>')
         else:
             from xml.sax.saxutils import escape
+
             elements.append(f"  <{key}>{escape(str(value))}</{key}>")
     body = "\n".join(elements)
     return f"<rdf:RDF {ns_decls}>\n<oslc_cm:ChangeRequest>\n{body}\n</oslc_cm:ChangeRequest>\n</rdf:RDF>"
