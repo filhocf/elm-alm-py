@@ -221,8 +221,8 @@ async def get_resource(uri: str) -> dict:
     return await _get_json(client, uri)
 
 
-async def _find_creation_factory(domain: str, project_url: str) -> str:
-    """Find the OSLC CreationFactory URL for a project."""
+async def _find_creation_factory(domain: str, project_url: str, wi_type: str | None = None) -> str:
+    """Find the OSLC CreationFactory URL for a project, optionally filtering by work item type."""
     client = await get_client()
     resource_type = QUERY_RESOURCE_TYPE[domain]
 
@@ -237,12 +237,28 @@ async def _find_creation_factory(domain: str, project_url: str) -> str:
             sp = await _get_xml(client, url)
         except Exception:
             continue
+
+        # Collect all matching creation factories
+        generic_factory = None
         for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
             rt_el = cf.find(f"{{{NS['oslc']}}}resourceType")
-            if rt_el is not None and rt_el.get(f"{{{NS['rdf']}}}resource") == resource_type:
-                creation = cf.find(f"{{{NS['oslc']}}}creation")
-                if creation is not None:
-                    return creation.get(f"{{{NS['rdf']}}}resource")
+            if rt_el is None or rt_el.get(f"{{{NS['rdf']}}}resource") != resource_type:
+                continue
+            creation = cf.find(f"{{{NS['oslc']}}}creation")
+            if creation is None:
+                continue
+            factory_url = creation.get(f"{{{NS['rdf']}}}resource")
+            # If a specific type is requested, check title match
+            if wi_type:
+                title_el = cf.find(f"{{{NS['dcterms']}}}title")
+                if title_el is not None and wi_type.lower() in title_el.text.lower():
+                    return factory_url
+            if generic_factory is None:
+                generic_factory = factory_url
+
+        if generic_factory:
+            return generic_factory
+
         # Fallback: any creation factory
         for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
             creation = cf.find(f"{{{NS['oslc']}}}creation")
@@ -252,12 +268,12 @@ async def _find_creation_factory(domain: str, project_url: str) -> str:
     raise ValueError(f"No creation factory found for {domain} in project '{project_url}'")
 
 
-async def create_resource(domain: str, project: str, payload: dict) -> dict:
+async def create_resource(domain: str, project: str, payload: dict, wi_type: str | None = None) -> dict:
     """POST a new resource to the creation factory."""
     if domain != "ccm":
         raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
     project_url = await _resolve_project_url(domain, project)
-    creation_url = await _find_creation_factory(domain, project_url)
+    creation_url = await _find_creation_factory(domain, project_url, wi_type=wi_type)
     client = await get_client()
     resp = await client.post(
         creation_url,

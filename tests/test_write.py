@@ -30,8 +30,15 @@ CCM_CATALOG_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
 
 CCM_SERVICES_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-    xmlns:oslc="http://open-services.net/ns/core#">
+    xmlns:oslc="http://open-services.net/ns/core#"
+    xmlns:dcterms="http://purl.org/dc/terms/">
     <oslc:CreationFactory>
+        <dcterms:title>defect</dcterms:title>
+        <oslc:resourceType rdf:resource="http://open-services.net/ns/cm#ChangeRequest"/>
+        <oslc:creation rdf:resource="{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect"/>
+    </oslc:CreationFactory>
+    <oslc:CreationFactory>
+        <dcterms:title>task</dcterms:title>
         <oslc:resourceType rdf:resource="http://open-services.net/ns/cm#ChangeRequest"/>
         <oslc:creation rdf:resource="{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"/>
     </oslc:CreationFactory>
@@ -70,13 +77,21 @@ async def test_find_creation_factory():
     _mock_ccm_discovery()
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     url = await oslc._find_creation_factory("ccm", project_url)
+    assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect"
+
+
+@respx.mock
+async def test_find_creation_factory_by_type():
+    _mock_ccm_discovery()
+    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
+    url = await oslc._find_creation_factory("ccm", project_url, wi_type="task")
     assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"
 
 
 @respx.mock
 async def test_create_resource():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
     result = await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "New Task"})
@@ -148,7 +163,7 @@ async def test_update_workitem_no_fields():
 @respx.mock
 async def test_create_resource_post_400():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
         return_value=httpx.Response(400, text="Bad Request")
     )
     with pytest.raises(httpx.HTTPStatusError):
@@ -158,7 +173,7 @@ async def test_create_resource_post_400():
 @respx.mock
 async def test_create_resource_post_401():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
         return_value=httpx.Response(401, text="Unauthorized")
     )
     with pytest.raises(httpx.HTTPStatusError):

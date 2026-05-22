@@ -85,7 +85,7 @@ async def create_workitem(
         ]
     if owner:
         payload["rtc_cm:ownedBy"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
-    return await oslc.create_resource("ccm", project, payload)
+    return await oslc.create_resource("ccm", project, payload, wi_type=type)
 
 
 @mcp.tool()
