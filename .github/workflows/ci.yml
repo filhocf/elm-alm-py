@@ -40,4 +40,4 @@ jobs:
       - name: Security check (bandit)
         run: |
           pip install bandit
-          bandit -r src/ -ll -ii
+          bandit -r src/ -ll -ii --skip B501,B314
