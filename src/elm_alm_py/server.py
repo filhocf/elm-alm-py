@@ -82,7 +82,9 @@ async def create_workitem(
     if type not in TYPE_IDS:
         raise ValueError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
     project_url = await oslc._resolve_project_url("ccm", project)
-    project_area_id = project_url.rstrip("/").split("/")[-1]
+    # project_url may be .../contexts/{id}/workitems/services.xml — extract the context ID
+    parts = project_url.split("/contexts/")
+    project_area_id = parts[1].split("/")[0] if len(parts) > 1 else project_url.rstrip("/").split("/")[-1]
     payload: dict = {
         "dcterms:title": title,
         "dcterms:type": "http://open-services.net/ns/cm#ChangeRequest",

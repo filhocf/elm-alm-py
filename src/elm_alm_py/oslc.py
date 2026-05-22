@@ -347,7 +347,11 @@ async def create_resource(domain: str, project: str, payload: dict, wi_type: str
     if domain != "ccm":
         raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
     project_url = await _resolve_project_url(domain, project)
-    creation_url = await _find_creation_factory(domain, project_url, wi_type=wi_type)
+    # Extract projectAreaId from URL (may contain /workitems/services.xml suffix)
+    parts = project_url.split("/contexts/")
+    project_area_id = parts[1].split("/")[0] if len(parts) > 1 else project_url.rstrip("/").split("/")[-1]
+    # Creation URL is always /workitems — the dc:type in payload differentiates WI type
+    creation_url = f"{settings.elm_url}/ccm/oslc/contexts/{project_area_id}/workitems"
     client = await get_client()
     rdfxml_body = _payload_to_rdfxml(payload)
     resp = await client.post(

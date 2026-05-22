@@ -35,7 +35,7 @@ CCM_SERVICES_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
     <oslc:CreationFactory>
         <dcterms:title>defect</dcterms:title>
         <oslc:resourceType rdf:resource="http://open-services.net/ns/cm#ChangeRequest"/>
-        <oslc:creation rdf:resource="{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect"/>
+        <oslc:creation rdf:resource="{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"/>
     </oslc:CreationFactory>
     <oslc:CreationFactory>
         <dcterms:title>task</dcterms:title>
@@ -83,7 +83,7 @@ async def test_find_creation_factory():
     _mock_ccm_discovery()
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     url = await oslc._find_creation_factory("ccm", project_url)
-    assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect"
+    assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"
 
 
 @respx.mock
@@ -97,7 +97,7 @@ async def test_find_creation_factory_by_type():
 @respx.mock
 async def test_create_resource():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
     result = await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "New Task"})
@@ -169,7 +169,7 @@ async def test_update_workitem_no_fields():
 @respx.mock
 async def test_create_resource_post_400():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(400, text="Bad Request")
     )
     with pytest.raises(httpx.HTTPStatusError):
@@ -179,7 +179,7 @@ async def test_create_resource_post_400():
 @respx.mock
 async def test_create_resource_post_401():
     _mock_ccm_discovery()
-    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems/defect").mock(
+    respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(401, text="Unauthorized")
     )
     with pytest.raises(httpx.HTTPStatusError):
@@ -216,17 +216,15 @@ async def test_update_resource_no_etag():
 
 
 @respx.mock
-async def test_creation_factory_not_found():
-    _mock_auth()
-    respx.get(f"{BASE}/ccm/rootservices").mock(return_value=httpx.Response(200, text=CCM_ROOTSERVICES_XML))
-    respx.get(f"{BASE}/ccm/oslc/workitems/catalog").mock(return_value=httpx.Response(200, text=CCM_CATALOG_XML))
-    # Return services XML with no CreationFactory
-    empty_services = '<?xml version="1.0"?><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"></rdf:RDF>'
-    respx.get(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/services").mock(
-        return_value=httpx.Response(200, text=empty_services)
+async def test_create_resource_posts_to_workitems_url():
+    """create_resource must POST to /contexts/{id}/workitems regardless of services.xml content."""
+    _mock_ccm_discovery()
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
     )
-    with pytest.raises(ValueError, match="No creation factory found"):
-        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+    result = await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+    assert post_route.called
+    assert result["dcterms:identifier"] == "42"
 
 
 async def test_create_resource_non_ccm_domain():
@@ -340,3 +338,130 @@ async def test_create_workitem_without_custom_fields():
     posted_body = post_route.calls[0].request.content.decode()
     assert "plannedFor" in posted_body
     assert "_iter2" in posted_body
+
+
+# === GOLDEN PAYLOAD TESTS (based on real server validation 22/mai/2026) ===
+# These tests verify the EXACT behavior that creates WIs successfully on alm.dataprev.gov.br
+# Reference: WI #628430 (manual), WI #629768 (automated)
+
+PROJECT_AREA_ID = "_MWxBEJB7Ee-fe_bes9r78g"
+CATEGORY_OID = "_ekfVwJB7Ee-fe_bes9r78g"
+ITERATION_OID = "_361O8T5XEfGJQth8TJaPLA"
+
+
+@respx.mock
+async def test_golden_creation_url_is_workitems_not_defect():
+    """Factory URL must be /workitems (not /workitems or /workitems/task)."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    # The POST must go to /workitems — NOT /workitems
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    result = await create_workitem(
+        project="MEU IMOVEL RURAL (MIR)", title="Test", type="task"
+    )
+    assert result["dcterms:identifier"] == "42"
+    assert post_route.called
+
+
+@respx.mock
+async def test_golden_content_type_is_rdf_xml():
+    """POST Content-Type must be application/rdf+xml."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    assert post_route.calls[0].request.headers["content-type"] == "application/rdf+xml"
+
+
+@respx.mock
+async def test_golden_category_uses_itemoid_format():
+    """filedAgainst must use /resource/itemOid/com.ibm.team.workitem.Category/{oid} format."""
+    _mock_auth()
+    respx.get(f"{BASE}/ccm/rootservices").mock(return_value=httpx.Response(200, text=CCM_ROOTSERVICES_XML))
+    respx.get(f"{BASE}/ccm/oslc/workitems/catalog").mock(return_value=httpx.Response(200, text=CCM_CATALOG_XML))
+    respx.get(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/services").mock(
+        return_value=httpx.Response(200, text=CCM_SERVICES_XML)
+    )
+    # Category API must return itemOid format
+    respx.get(f"{BASE}/ccm/oslc/categories").mock(
+        return_value=httpx.Response(200, json={
+            "oslc:results": [{"rdf:about": f"{BASE}/ccm/resource/itemOid/com.ibm.team.workitem.Category/{CATEGORY_OID}"}]
+        })
+    )
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    body = post_route.calls[0].request.content.decode()
+    assert f"resource/itemOid/com.ibm.team.workitem.Category/{CATEGORY_OID}" in body
+
+
+@respx.mock
+async def test_golden_custom_fields_as_rdf_resource():
+    """custom_fields with rdf:resource values must render as rdf:resource attributes in XML."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    await create_workitem(
+        project="MEU IMOVEL RURAL (MIR)",
+        title="Test",
+        type="task",
+        custom_fields={
+            "rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": {
+                "rdf:resource": f"{BASE}/ccm/oslc/enumerations/{PROJECT_AREA_ID}/com.dataprev.team.workitem.enumeration.categoriatarefa/com.dataprev.team.workitem.enumeration.categoriatarefa.literal.l10"
+            }
+        },
+    )
+    body = post_route.calls[0].request.content.decode()
+    assert "categoriatarefa" in body
+    assert "rdf:resource" in body
+    assert "literal.l10" in body
+
+
+@respx.mock
+async def test_golden_type_id_is_task_not_requirementchangerequest():
+    """rtc_cm:type URI must use 'task' (not 'requirementChangeRequest' which is the calm:id)."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={"oslc:results": []})
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    body = post_route.calls[0].request.content.decode()
+    assert f"/types/{PROJECT_AREA_ID}/task" in body
+
+
+@respx.mock
+async def test_golden_plannedfor_iteration_format():
+    """plannedFor must use /oslc/iterations/{iterationOid} (without projectAreaId in path)."""
+    _mock_ccm_discovery()
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
+        return_value=httpx.Response(200, json={
+            "oslc:results": [
+                {"rdf:about": f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}", "rtc_cm:current": True}
+            ]
+        })
+    )
+    post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(201, json=CREATED_WI)
+    )
+    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    body = post_route.calls[0].request.content.decode()
+    assert f"/oslc/iterations/{ITERATION_OID}" in body
