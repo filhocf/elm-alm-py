@@ -246,9 +246,15 @@ async def _find_default_category(project_url: str) -> str | None:
 
 
 async def _find_current_iteration(project_url: str) -> str | None:
-    """Discover the current iteration (plannedFor) for a CCM project area."""
+    """Discover the current iteration (plannedFor) for a CCM project area.
+
+    Finds the iteration whose date range contains today. Falls back to last iteration with dates.
+    """
+    from datetime import datetime, timezone
+
     client = await get_client()
-    project_area_id = project_url.rstrip("/").split("/")[-1]
+    parts = project_url.split("/contexts/")
+    project_area_id = parts[1].split("/")[0] if len(parts) > 1 else project_url.rstrip("/").split("/")[-1]
     iterations_url = f"{settings.elm_url}/ccm/oslc/iterations?projectArea={project_area_id}"
     try:
         resp = await client.get(
@@ -256,13 +262,31 @@ async def _find_current_iteration(project_url: str) -> str | None:
             headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
         )
         resp.raise_for_status()
-        data = resp.json()
-        members = data.get("oslc:results", data.get("rdfs:member", []))
-        if members and isinstance(members, list):
-            for m in members:
-                if m.get("rtc_cm:current", False):
-                    return m.get("rdf:about", m.get("rdf:resource"))
-            return members[-1].get("rdf:about", members[-1].get("rdf:resource"))
+        members = resp.json().get("oslc:results", [])
+        now = datetime.now(timezone.utc)
+        candidates = []  # (uri, start_dt, has_end)
+        for m in members:
+            iter_uri = m.get("rdf:resource")
+            if not iter_uri:
+                continue
+            detail = await client.get(iter_uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+            if detail.status_code != 200:
+                continue
+            d = detail.json()
+            start = d.get("rtc_cm:startDate")
+            end = d.get("rtc_cm:endDate")
+            if not start:
+                continue
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00")) if end else None
+            is_current = start_dt <= now and (end_dt is None or now <= end_dt)
+            if is_current:
+                candidates.append((iter_uri, start_dt, end_dt is not None))
+        if candidates:
+            # Prefer: bounded (has end_date) > unbounded, then most recent start
+            candidates.sort(key=lambda x: (x[2], x[1]), reverse=True)
+            return candidates[0][0]
+        return None
     except Exception:
         pass
     return None

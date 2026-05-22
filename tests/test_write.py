@@ -237,11 +237,21 @@ async def test_create_resource_non_ccm_domain():
 
 ITERATIONS_JSON = {
     "oslc:results": [
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter1", "dcterms:title": "Entrega 4", "rtc_cm:current": False},
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter2", "dcterms:title": "Entrega 5", "rtc_cm:current": True},
-        {"rdf:about": f"{BASE}/ccm/oslc/iterations/_iter3", "dcterms:title": "Entrega 6", "rtc_cm:current": False},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter1"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter2"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_iter3"},
     ]
 }
+
+ITER_DETAIL_1 = {"dcterms:title": "Entrega 4", "rtc_cm:startDate": "2026-04-01T00:00:00.000Z", "rtc_cm:endDate": "2026-04-30T00:00:00.000Z"}
+ITER_DETAIL_2 = {"dcterms:title": "Sprint 2", "rtc_cm:startDate": "2026-05-01T00:00:00.000Z", "rtc_cm:endDate": "2026-12-31T00:00:00.000Z"}
+ITER_DETAIL_3 = {"dcterms:title": "Entrega 6", "rtc_cm:startDate": "2027-01-01T00:00:00.000Z", "rtc_cm:endDate": "2027-06-30T00:00:00.000Z"}
+
+
+def _mock_iteration_details():
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter1").mock(return_value=httpx.Response(200, json=ITER_DETAIL_1))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter2").mock(return_value=httpx.Response(200, json=ITER_DETAIL_2))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_iter3").mock(return_value=httpx.Response(200, json=ITER_DETAIL_3))
 
 
 @respx.mock
@@ -250,26 +260,27 @@ async def test_find_current_iteration_returns_current():
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(
         return_value=httpx.Response(200, json=ITERATIONS_JSON)
     )
+    _mock_iteration_details()
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
+    # _iter2 has date range that includes "now" (2026-05-01 to 2026-12-31)
     assert result == f"{BASE}/ccm/oslc/iterations/_iter2"
 
 
 @respx.mock
-async def test_find_current_iteration_fallback_to_last():
+async def test_find_current_iteration_fallback_returns_none_if_all_past():
+    """If no iteration contains 'now', return None."""
     _mock_auth()
-    no_current = {
-        "oslc:results": [
-            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_a", "dcterms:title": "Sprint 1"},
-            {"rdf:about": f"{BASE}/ccm/oslc/iterations/_b", "dcterms:title": "Sprint 2"},
-        ]
-    }
-    respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=no_current)
-    )
+    past_iters = {"oslc:results": [
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_a"},
+        {"rdf:resource": f"{BASE}/ccm/oslc/iterations/_b"},
+    ]}
+    respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=past_iters))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_a").mock(return_value=httpx.Response(200, json={"dcterms:title": "Old 1", "rtc_cm:startDate": "2024-01-01T00:00:00.000Z", "rtc_cm:endDate": "2024-06-30T00:00:00.000Z"}))
+    respx.get(f"{BASE}/ccm/oslc/iterations/_b").mock(return_value=httpx.Response(200, json={"dcterms:title": "Old 2", "rtc_cm:startDate": "2024-07-01T00:00:00.000Z", "rtc_cm:endDate": "2024-12-31T00:00:00.000Z"}))
     project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
     result = await oslc._find_current_iteration(project_url)
-    assert result == f"{BASE}/ccm/oslc/iterations/_b"
+    assert result is None
 
 
 @respx.mock
@@ -299,7 +310,7 @@ async def test_create_workitem_with_custom_fields():
     """custom_fields dict should be injected into the RDF/XML payload."""
     _mock_ccm_discovery()
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=ITERATIONS_JSON)
+        return_value=httpx.Response(200, json={"oslc:results": []})
     )
     # Capture the POST body to verify custom fields are included
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
@@ -320,10 +331,10 @@ async def test_create_workitem_with_custom_fields():
 
 @respx.mock
 async def test_create_workitem_without_custom_fields():
-    """Without custom_fields, no extra fields should be injected."""
+    """Without custom_fields, no extra fields should be injected. plannedFor only if iteration found."""
     _mock_ccm_discovery()
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(
-        return_value=httpx.Response(200, json=ITERATIONS_JSON)
+        return_value=httpx.Response(200, json={"oslc:results": []})
     )
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
@@ -334,10 +345,9 @@ async def test_create_workitem_without_custom_fields():
         type="task",
     )
     assert result["dcterms:identifier"] == "42"
-    # plannedFor should still be auto-discovered
+    # No iterations available → no plannedFor in payload
     posted_body = post_route.calls[0].request.content.decode()
-    assert "plannedFor" in posted_body
-    assert "_iter2" in posted_body
+    assert "plannedFor" not in posted_body
 
 
 # === GOLDEN PAYLOAD TESTS (based on real server validation 22/mai/2026) ===
@@ -455,8 +465,16 @@ async def test_golden_plannedfor_iteration_format():
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(
         return_value=httpx.Response(200, json={
             "oslc:results": [
-                {"rdf:about": f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}", "rtc_cm:current": True}
+                {"rdf:resource": f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}"}
             ]
+        })
+    )
+    # Mock iteration detail with current date range
+    respx.get(f"{BASE}/ccm/oslc/iterations/{ITERATION_OID}").mock(
+        return_value=httpx.Response(200, json={
+            "dcterms:title": "Sprint 2",
+            "rtc_cm:startDate": "2026-01-01T00:00:00.000Z",
+            "rtc_cm:endDate": "2027-12-31T00:00:00.000Z",
         })
     )
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
