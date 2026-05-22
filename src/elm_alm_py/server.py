@@ -117,15 +117,37 @@ async def update_workitem(
     id: str,
     title: str | None = None,
     description: str | None = None,
+    owner: str | None = None,
+    estimate_hours: float | None = None,
+    planned_for: str | None = None,
+    custom_fields: dict | None = None,
 ) -> dict:
-    """Update fields of an existing work item via OSLC PUT."""
+    """Update fields of an existing work item via OSLC PUT.
+
+    Args:
+        id: Work item ID (number)
+        title: New title (optional)
+        description: New description (optional)
+        owner: Username to assign (e.g., "claudio.filho")
+        estimate_hours: Estimate in hours (e.g., 8 = 8h)
+        planned_for: Iteration URI (e.g., from get_workitem response)
+        custom_fields: Dict of extra fields to merge into PUT payload
+    """
     payload: dict = {}
     if title is not None:
         payload["dcterms:title"] = title
     if description is not None:
         payload["dcterms:description"] = description
+    if owner is not None:
+        payload["dcterms:contributor"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
+    if estimate_hours is not None:
+        payload["rtc_cm:estimate"] = int(estimate_hours * 3600000)
+    if planned_for is not None:
+        payload["rtc_cm:plannedFor"] = {"rdf:resource": planned_for}
+    if custom_fields:
+        payload.update(custom_fields)
     if not payload:
-        raise ValueError("At least one field (title, description) must be provided")
+        raise ValueError("At least one field must be provided")
     uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
     return await oslc.update_resource(uri, payload)
 

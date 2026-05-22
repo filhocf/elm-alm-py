@@ -465,3 +465,79 @@ async def test_golden_plannedfor_iteration_format():
     await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
     body = post_route.calls[0].request.content.decode()
     assert f"/oslc/iterations/{ITERATION_OID}" in body
+
+
+# === #20: update_workitem expanded (owner, planned_for, estimate_hours, custom_fields) ===
+
+
+@respx.mock
+async def test_update_workitem_owner():
+    """owner parameter must set dcterms:contributor with rdf:resource."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    updated = {**CREATED_WI, "dcterms:contributor": {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    result = await update_workitem(id="42", owner="claudio.filho")
+    assert result["dcterms:contributor"]["rdf:resource"] == f"{BASE}/jts/users/claudio.filho"
+    body = put_route.calls[0].request.content
+    import json as _json
+    sent = _json.loads(body)
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+
+
+@respx.mock
+async def test_update_workitem_estimate_hours():
+    """estimate_hours must set rtc_cm:estimate in milliseconds."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    updated = {**CREATED_WI, "rtc_cm:estimate": 28800000}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    result = await update_workitem(id="42", estimate_hours=8)
+    body = put_route.calls[0].request.content
+    import json as _json
+    sent = _json.loads(body)
+    assert sent["rtc_cm:estimate"] == 28800000  # 8h * 3600000
+
+
+@respx.mock
+async def test_update_workitem_planned_for():
+    """planned_for must set rtc_cm:plannedFor with rdf:resource."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    iteration_uri = f"{BASE}/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA"
+    updated = {**CREATED_WI, "rtc_cm:plannedFor": {"rdf:resource": iteration_uri}}
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
+    result = await update_workitem(id="42", planned_for=iteration_uri)
+    body = put_route.calls[0].request.content
+    import json as _json
+    sent = _json.loads(body)
+    assert sent["rtc_cm:plannedFor"] == {"rdf:resource": iteration_uri}
+
+
+@respx.mock
+async def test_update_workitem_custom_fields():
+    """custom_fields dict must be merged into the PUT payload."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    respx.put(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
+    await update_workitem(id="42", custom_fields={"rtc_cm:someField": "value"})
+
+
+@respx.mock
+async def test_update_workitem_multiple_fields():
+    """Multiple fields can be updated in a single call."""
+    _mock_auth()
+    uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
+    respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
+    put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
+    await update_workitem(id="42", title="New Title", owner="claudio.filho", estimate_hours=16)
+    body = put_route.calls[0].request.content
+    import json as _json
+    sent = _json.loads(body)
+    assert sent["dcterms:title"] == "New Title"
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+    assert sent["rtc_cm:estimate"] == 57600000
