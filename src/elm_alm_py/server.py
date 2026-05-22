@@ -64,6 +64,7 @@ async def create_workitem(
     description: str | None = None,
     parent_id: str | None = None,
     owner: str | None = None,
+    filed_against: str | None = None,
 ) -> dict:
     """Create a work item in an RTC project via OSLC."""
     if type not in TYPE_IDS:
@@ -85,6 +86,11 @@ async def create_workitem(
         ]
     if owner:
         payload["rtc_cm:ownedBy"] = {"rdf:resource": f"{settings.elm_url}/jts/users/{owner}"}
+    # Auto-discover default category if not provided
+    if not filed_against:
+        filed_against = await oslc._find_default_category(project_url)
+    if filed_against:
+        payload["rtc_cm:filedAgainst"] = {"rdf:resource": filed_against}
     return await oslc.create_resource("ccm", project, payload, wi_type=type)
 
 

@@ -70,6 +70,12 @@ def _mock_ccm_discovery():
     respx.get(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/services").mock(
         return_value=httpx.Response(200, text=CCM_SERVICES_XML)
     )
+    respx.get(f"{BASE}/ccm/oslc/categories").mock(
+        return_value=httpx.Response(
+            200,
+            json={"oslc:results": [{"rdf:about": f"{BASE}/ccm/oslc/categories/_MWxBEJB7Ee-fe_bes9r78g/default"}]},
+        )
+    )
 
 
 @respx.mock
