@@ -221,8 +221,32 @@ async def get_resource(uri: str) -> dict:
     return await _get_json(client, uri)
 
 
-async def _find_creation_factory(domain: str, project_url: str) -> str:
-    """Find the OSLC CreationFactory URL for a project."""
+async def _find_default_category(project_url: str) -> str | None:
+    """Discover the default category (filedAgainst) for a CCM project area."""
+    client = await get_client()
+    # RTC exposes categories at /ccm/oslc/categories?projectArea={id}
+    project_area_id = project_url.rstrip("/").split("/")[-1]
+    categories_url = f"{settings.elm_url}/ccm/oslc/categories?projectArea={project_area_id}"
+    try:
+        resp = await client.get(
+            categories_url,
+            headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        # Categories are in the response; pick the first (default) one
+        members = data.get("oslc:results", data.get("rdfs:member", []))
+        if members and isinstance(members, list):
+            first = members[0]
+            # Return the rdf:about URI of the category
+            return first.get("rdf:about", first.get("rdf:resource"))
+    except Exception:
+        pass
+    return None
+
+
+async def _find_creation_factory(domain: str, project_url: str, wi_type: str | None = None) -> str:
+    """Find the OSLC CreationFactory URL for a project, optionally filtering by work item type."""
     client = await get_client()
     resource_type = QUERY_RESOURCE_TYPE[domain]
 
@@ -237,12 +261,28 @@ async def _find_creation_factory(domain: str, project_url: str) -> str:
             sp = await _get_xml(client, url)
         except Exception:
             continue
+
+        # Collect all matching creation factories
+        generic_factory = None
         for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
             rt_el = cf.find(f"{{{NS['oslc']}}}resourceType")
-            if rt_el is not None and rt_el.get(f"{{{NS['rdf']}}}resource") == resource_type:
-                creation = cf.find(f"{{{NS['oslc']}}}creation")
-                if creation is not None:
-                    return creation.get(f"{{{NS['rdf']}}}resource")
+            if rt_el is None or rt_el.get(f"{{{NS['rdf']}}}resource") != resource_type:
+                continue
+            creation = cf.find(f"{{{NS['oslc']}}}creation")
+            if creation is None:
+                continue
+            factory_url = creation.get(f"{{{NS['rdf']}}}resource")
+            # If a specific type is requested, check title match
+            if wi_type:
+                title_el = cf.find(f"{{{NS['dcterms']}}}title")
+                if title_el is not None and wi_type.lower() in title_el.text.lower():
+                    return factory_url
+            if generic_factory is None:
+                generic_factory = factory_url
+
+        if generic_factory:
+            return generic_factory
+
         # Fallback: any creation factory
         for cf in sp.iter(f"{{{NS['oslc']}}}CreationFactory"):
             creation = cf.find(f"{{{NS['oslc']}}}creation")
@@ -252,18 +292,45 @@ async def _find_creation_factory(domain: str, project_url: str) -> str:
     raise ValueError(f"No creation factory found for {domain} in project '{project_url}'")
 
 
-async def create_resource(domain: str, project: str, payload: dict) -> dict:
-    """POST a new resource to the creation factory."""
+def _payload_to_rdfxml(payload: dict) -> str:
+    """Convert a payload dict to RDF/XML format for OSLC resource creation."""
+    # Namespace prefixes used in payloads
+    ns_map = {
+        "dcterms": "http://purl.org/dc/terms/",
+        "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+        "oslc_cm": "http://open-services.net/ns/cm#",
+        "rtc_cm": "http://jazz.net/xmlns/prod/jazz/rtc/cm/1.0/",
+        "rtc_ext": "http://jazz.net/xmlns/prod/jazz/rtc/ext/1.0/",
+    }
+    # Build namespace declarations
+    ns_decls = " ".join(f'xmlns:{p}="{u}"' for p, u in ns_map.items())
+    elements = []
+    for key, value in payload.items():
+        if isinstance(value, dict) and "rdf:resource" in value:
+            elements.append(f'  <{key} rdf:resource="{value["rdf:resource"]}"/>')
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict) and "rdf:resource" in item:
+                    elements.append(f'  <{key} rdf:resource="{item["rdf:resource"]}"/>')
+        else:
+            elements.append(f"  <{key}>{value}</{key}>")
+    body = "\n".join(elements)
+    return f"<rdf:RDF {ns_decls}>\n<oslc_cm:ChangeRequest>\n{body}\n</oslc_cm:ChangeRequest>\n</rdf:RDF>"
+
+
+async def create_resource(domain: str, project: str, payload: dict, wi_type: str | None = None) -> dict:
+    """POST a new resource (RDF/XML) to the creation factory."""
     if domain != "ccm":
         raise NotImplementedError(f"create_resource only supports 'ccm' domain, got '{domain}'")
     project_url = await _resolve_project_url(domain, project)
-    creation_url = await _find_creation_factory(domain, project_url)
+    creation_url = await _find_creation_factory(domain, project_url, wi_type=wi_type)
     client = await get_client()
+    rdfxml_body = _payload_to_rdfxml(payload)
     resp = await client.post(
         creation_url,
-        json=payload,
+        content=rdfxml_body,
         headers={
-            "Content-Type": "application/json",
+            "Content-Type": "application/rdf+xml",
             "Accept": "application/json",
             "OSLC-Core-Version": "2.0",
         },
