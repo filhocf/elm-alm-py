@@ -34,7 +34,25 @@ async def get_requirement(uri: str) -> dict:
 @mcp.tool()
 async def list_workitems(project: str, query: str | None = None) -> list[dict]:
     """Search work items in an RTC project. Query uses oslc.where syntax."""
-    return await oslc.query_resources("ccm", project, query)
+    select = "dcterms:title,dcterms:identifier,dcterms:type,oslc_cm:status,dcterms:contributor"
+    results = await oslc.query_resources("ccm", project, query, select=select)
+    parsed = []
+    for item in results:
+        entry = {"rdf:about": item.get("rdf:about", item.get("rdf:resource", ""))}
+        if "dcterms:title" in item:
+            entry["title"] = item["dcterms:title"]
+        if "dcterms:identifier" in item:
+            entry["id"] = item["dcterms:identifier"]
+        if "dcterms:type" in item:
+            t = item["dcterms:type"]
+            entry["type"] = t.get("rdf:resource", t) if isinstance(t, dict) else t
+        if "oslc_cm:status" in item:
+            entry["status"] = item["oslc_cm:status"]
+        if "dcterms:contributor" in item:
+            c = item["dcterms:contributor"]
+            entry["owner"] = c.get("rdf:resource", c) if isinstance(c, dict) else c
+        parsed.append(entry)
+    return parsed
 
 
 @mcp.tool()

@@ -70,6 +70,10 @@ def _mock_ccm_discovery():
     respx.get(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/services").mock(
         return_value=httpx.Response(200, text=CCM_SERVICES_XML)
     )
+    # Session refresh GET (create_resource does this before POST)
+    respx.get(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
+        return_value=httpx.Response(200, json={})
+    )
     respx.get(f"{BASE}/ccm/oslc/categories").mock(
         return_value=httpx.Response(
             200,
@@ -428,6 +432,10 @@ async def test_golden_category_uses_itemoid_format():
         )
     )
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json={"oslc:results": []}))
+    # Session refresh GET (create_resource does this before POST)
+    respx.get(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
+        return_value=httpx.Response(200, json={})
+    )
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )

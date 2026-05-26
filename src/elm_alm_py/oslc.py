@@ -157,7 +157,9 @@ async def _resolve_project_url(domain: str, project_name: str) -> str:
     raise ValueError(f"Project '{project_name}' not found. Available: {available}")
 
 
-async def query_resources(domain: str, project: str, where: str | None = None) -> list[dict]:
+async def query_resources(
+    domain: str, project: str, where: str | None = None, select: str | None = None
+) -> list[dict]:
     """Execute an OSLC query on a project, returning JSON results."""
     project_url = await _resolve_project_url(domain, project)
     query_base = await _find_query_base(domain, project_url)
@@ -165,6 +167,8 @@ async def query_resources(domain: str, project: str, where: str | None = None) -
     params = {}
     if where:
         params["oslc.where"] = where
+    if select:
+        params["oslc.select"] = select
     params["oslc.pageSize"] = "50"
 
     # If query_base already has query params (e.g., RM /views?oslc.query=true&projectURL=...),
@@ -383,15 +387,24 @@ async def create_resource(domain: str, project: str, payload: dict, wi_type: str
     creation_url = f"{settings.elm_url}/ccm/oslc/contexts/{project_area_id}/workitems"
     client = await get_client()
     rdfxml_body = _payload_to_rdfxml(payload)
-    resp = await client.post(
+    # Refresh session (prevents CSRF stale after idle)
+    await client.get(
         creation_url,
-        content=rdfxml_body,
-        headers={
-            "Content-Type": "application/rdf+xml",
-            "Accept": "application/json",
-            "OSLC-Core-Version": "2.0",
-        },
+        headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
     )
+    post_headers = {
+        "Content-Type": "application/rdf+xml",
+        "Accept": "application/json",
+        "OSLC-Core-Version": "2.0",
+    }
+    resp = await client.post(creation_url, content=rdfxml_body, headers=post_headers)
+    if resp.status_code in (401, 403) or "j_security_check" in str(
+        resp.headers.get("location", "")
+    ):
+        from .auth import _authenticate
+
+        await _authenticate(client)
+        resp = await client.post(creation_url, content=rdfxml_body, headers=post_headers)
     if resp.status_code != 201:
         resp.raise_for_status()
         raise RuntimeError(f"Expected 201 Created, got {resp.status_code}")
