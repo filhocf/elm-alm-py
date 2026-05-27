@@ -107,6 +107,101 @@ async def list_iterations(project: str) -> list[dict]:
 
 
 @mcp.tool()
+async def get_plan_items(project: str, plan: str | None = None, item_ids: list[str] | None = None) -> dict:
+    """Get hierarchical view of Items de Backlog with their child Tarefas expanded.
+
+    RTC/EWM hierarchy: Plan → Sprint → Item de Backlog (grouper) → Tarefa (actual work).
+    This tool resolves the hierarchy in one call, avoiding N+1 queries.
+
+    Two modes:
+    - item_ids: expand specific IBs by ID (fastest, use when you know the IDs)
+    - plan: match iteration by title substring, then find IBs planned for it
+
+    Args:
+        project: Project name (e.g., "MEU IMOVEL RURAL (MIR)")
+        plan: Iteration title substring to match (e.g., "Entrega 5"). Optional.
+        item_ids: List of IB IDs to expand directly (e.g., ["622299", "622289"]). Optional.
+    """
+    if not plan and not item_ids:
+        return {"error": "Provide either 'plan' (iteration name) or 'item_ids' (list of IB IDs)"}
+
+    iteration_info = None
+
+    if item_ids:
+        # Direct mode: expand given IB IDs
+        ib_ids_to_fetch = item_ids
+    else:
+        # Iteration mode: find matching iteration, then get IBs
+        iterations = await list_iterations(project)
+        matched = [i for i in iterations if plan.lower() in i["title"].lower()]
+        if not matched:
+            return {"error": f"No iteration matching '{plan}'", "available": [i["title"] for i in iterations if i["start_date"]]}
+        iteration_info = matched[0]
+        iter_uri = iteration_info["uri"]
+
+        # Get all IBs (type=story) and filter by plannedFor
+        all_items = await oslc.query_resources(
+            "ccm", project, None,
+            select="dcterms:title,dcterms:identifier,dcterms:type"
+        )
+        ib_ids_to_fetch = []
+        for item in all_items:
+            item_type = item.get("dcterms:type", "")
+            if isinstance(item_type, dict):
+                item_type = item_type.get("rdf:resource", "")
+            if "story" in str(item_type).lower():
+                ib_id = item.get("dcterms:identifier", "")
+                if ib_id:
+                    ib_ids_to_fetch.append(ib_id)
+
+    # Fetch each IB and build hierarchy
+    result_items = []
+    for ib_id in ib_ids_to_fetch:
+        try:
+            full = await get_workitem(ib_id)
+        except Exception:
+            continue
+
+        # If filtering by iteration, check plannedFor
+        if iteration_info:
+            planned = full.get("rtc_cm:plannedFor", {})
+            planned_uri = planned.get("rdf:resource", "") if isinstance(planned, dict) else str(planned)
+            if iter_uri not in planned_uri:
+                continue
+
+        # Extract children
+        children_raw = full.get("rtc_cm:com.ibm.team.workitem.linktype.parentworkitem.children", [])
+        children = []
+        for child in children_raw:
+            raw_title = child.get("dcterms:title", "")
+            child_id = raw_title.split(":")[0].strip() if ":" in raw_title else ""
+            child_title = raw_title.split(": ", 1)[1] if ": " in raw_title else raw_title
+            children.append({"id": child_id, "title": child_title, "uri": child.get("rdf:resource", "")})
+
+        status = full.get("oslc_cm:status", "")
+        owner = full.get("dcterms:contributor", {})
+        if isinstance(owner, dict):
+            owner = owner.get("rdf:resource", "").split("/")[-1]
+
+        result_items.append({
+            "id": ib_id,
+            "type": "Item de Backlog",
+            "title": full.get("dcterms:title", ""),
+            "status": status,
+            "owner": owner,
+            "children_count": len(children),
+            "children": children,
+        })
+
+    result = {"items_count": len(result_items), "items": result_items}
+    if iteration_info:
+        result["iteration"] = iteration_info["title"]
+        result["start_date"] = iteration_info["start_date"]
+        result["end_date"] = iteration_info["end_date"]
+    return result
+
+
+@mcp.tool()
 async def create_workitem(
     project: str,
     title: str,
