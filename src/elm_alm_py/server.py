@@ -319,6 +319,74 @@ async def add_child_workitem(
     )
 
 
+@mcp.tool()
+async def transition_workitem(id: str, action: str) -> str:
+    """Transition a work item's workflow state.
+
+    Args:
+        id: Work item ID
+        action: One of: start, resolve, close, reopen
+    """
+    valid_actions = ("start", "resolve", "close", "reopen")
+    if action not in valid_actions:
+        raise ValueError(f"Invalid action '{action}'. Must be one of: {valid_actions}")
+
+    uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
+    client = await oslc.get_client()
+
+    # GET current state + ETag
+    get_resp = await client.get(uri, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+    get_resp.raise_for_status()
+    etag = get_resp.headers.get("ETag", "")
+    if not etag:
+        raise ValueError(f"Server did not return an ETag for work item {id}")
+
+    current = get_resp.json()
+
+    # Discover available actions from workflow
+    actions_url = f"{uri}/rtc_cm:workflowActions"
+    actions_resp = await client.get(actions_url, headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"})
+
+    target_state_uri = None
+    if actions_resp.status_code == 200:
+        actions_data = actions_resp.json()
+        workflow_actions = actions_data.get("rtc_cm:actions", [])
+        if isinstance(workflow_actions, dict):
+            workflow_actions = [workflow_actions]
+        for wa in workflow_actions:
+            wa_id = (wa.get("dcterms:identifier") or "").lower()
+            if action in wa_id:
+                result_state = wa.get("rtc_cm:resultState") or {}
+                target_state_uri = result_state.get("rdf:resource", "")
+                break
+
+    # Fallback: hardcoded common RTC state mappings
+    if not target_state_uri:
+        base = f"{settings.elm_url}/ccm/oslc/workflows"
+        state_map = {
+            "start": f"{base}/states/com.ibm.team.workitem.taskWorkflow/2",
+            "resolve": f"{base}/states/com.ibm.team.workitem.taskWorkflow/3",
+            "close": f"{base}/states/com.ibm.team.workitem.taskWorkflow/4",
+            "reopen": f"{base}/states/com.ibm.team.workitem.taskWorkflow/1",
+        }
+        target_state_uri = state_map[action]
+
+    # PUT with updated state
+    current["rtc_cm:state"] = {"rdf:resource": target_state_uri}
+    resp = await client.put(
+        uri,
+        json=current,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "OSLC-Core-Version": "2.0",
+            "If-Match": etag,
+        },
+    )
+    resp.raise_for_status()
+    return f"Work item {id} transitioned to '{action}' (state: {target_state_uri})"
+
+
 def main():
     """Entry point for the MCP server."""
     mcp.run(transport="stdio")
