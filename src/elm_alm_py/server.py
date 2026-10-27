@@ -2,14 +2,15 @@
 
 import logging
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from . import oslc
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP("elm-alm-py", instructions="IBM ELM (DOORS Next, RTC, ETM) via OSLC")
+mcp = MCPServer("elm-alm-py", instructions="IBM ELM (DOORS Next, RTC, ETM) via OSLC")
 
 VALID_DOMAINS = ("rm", "ccm", "qm")
 
@@ -19,7 +20,7 @@ async def list_projects(domain: str) -> list[dict]:
     """List projects for a domain (rm=DOORS Next, ccm=RTC, qm=ETM)."""
     domain = domain.lower()
     if domain not in VALID_DOMAINS:
-        raise ValueError(f"Invalid domain '{domain}'. Must be one of: {VALID_DOMAINS}")
+        raise ToolError(f"Invalid domain '{domain}'. Must be one of: {VALID_DOMAINS}")
     return await oslc.list_service_providers(domain)
 
 
@@ -234,7 +235,7 @@ async def create_workitem(
         custom_fields: Dict of extra RDF fields to inject (e.g., {"rtc_ext:campo": "valor"})
     """
     if type not in TYPE_IDS:
-        raise ValueError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
+        raise ToolError(f"Invalid type '{type}'. Must be one of: {list(TYPE_IDS.keys())}")
     project_url = await oslc._resolve_project_url("ccm", project)
     # project_url may be .../contexts/{id}/workitems/services.xml — extract the context ID
     parts = project_url.split("/contexts/")
@@ -303,7 +304,7 @@ async def update_workitem(
     if custom_fields:
         payload.update(custom_fields)
     if not payload:
-        raise ValueError("At least one field must be provided")
+        raise ToolError("At least one field must be provided")
     uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
     return await oslc.update_resource(uri, payload)
 
@@ -338,7 +339,7 @@ async def transition_workitem(id: str, action: str) -> str:
     """
     valid_actions = ("start", "resolve", "close", "reopen")
     if action not in valid_actions:
-        raise ValueError(f"Invalid action '{action}'. Must be one of: {valid_actions}")
+        raise ToolError(f"Invalid action '{action}'. Must be one of: {valid_actions}")
 
     uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
     client = await oslc.get_client()
@@ -348,7 +349,7 @@ async def transition_workitem(id: str, action: str) -> str:
     get_resp.raise_for_status()
     etag = get_resp.headers.get("ETag", "")
     if not etag:
-        raise ValueError(f"Server did not return an ETag for work item {id}")
+        raise ToolError(f"Server did not return an ETag for work item {id}")
 
     current = get_resp.json()
 

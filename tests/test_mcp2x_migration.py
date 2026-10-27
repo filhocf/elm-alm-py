@@ -29,10 +29,9 @@ Conventions: pytest + respx, asyncio_mode=auto (AGENTS.md).
 # --- 2.x API imports (TARGET). On mcp 1.x these raise ModuleNotFoundError at
 #     collection time -> the whole module is RED. Do NOT wrap in try/except;
 #     the collection error IS the intended RED signal. ---
+import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
-
-import pytest
 
 from elm_alm_py import server
 from elm_alm_py.server import (
@@ -41,7 +40,6 @@ from elm_alm_py.server import (
     transition_workitem,
     update_workitem,
 )
-
 
 # =============================================================================
 # F1 — Boot / smoke: the server runs on the 2.x API (MCPServer), not FastMCP.

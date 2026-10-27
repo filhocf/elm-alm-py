@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 from elm_alm_py.server import (
     get_requirement,
@@ -41,7 +42,7 @@ async def test_list_projects_qm():
 
 @pytest.mark.asyncio
 async def test_list_projects_invalid_domain_raises():
-    with pytest.raises(ValueError, match="Invalid domain"):
+    with pytest.raises(ToolError, match="Invalid domain"):
         await list_projects("invalid")
 
 
