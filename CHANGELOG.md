@@ -16,7 +16,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ### Fixed
 
-- Pin `mcp<2`: mcp 2.x removed `mcp.server.fastmcp`, so `elm-alm-py serve` crashed on startup with `ModuleNotFoundError`
+- Pin `mcp<2`: mcp 2.x removed `mcp.server.fastmcp`, so `elm-alm-py serve` crashed on startup with `ModuleNotFoundError` (#33)
 - `create_workitem` no longer fails with HTTP 500 after an idle session: the session is refreshed before the POST, with re-authentication on 401/403 (#24)
 
 ## [0.3.0] - 2026-05-22
