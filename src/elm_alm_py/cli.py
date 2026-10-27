@@ -11,7 +11,7 @@ import httpx
 CRED_FILE = os.path.expanduser("~/.elm_creds.json")
 
 
-def login():
+def login() -> None:
     """Authenticate to ELM and save credentials."""
     url = input("ELM URL (e.g. https://elm.example.com): ").strip()
     if not url:
@@ -59,7 +59,7 @@ def login():
     print(f"✅ Credenciais salvas em {CRED_FILE} (senha em base64, chmod 600)")
 
 
-def main():
+def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "login":
         login()
     elif len(sys.argv) < 2 or sys.argv[1] == "serve":

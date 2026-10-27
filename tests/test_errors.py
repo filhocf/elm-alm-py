@@ -1,10 +1,12 @@
 """Tests for error handling — timeouts, auth failures, malformed XML."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
-import httpx
+from xml.etree import ElementTree as ET
 
-from elm_alm_py.oslc import get_catalog_url, query_resources, get_resource
+import httpx
+import pytest
+
+from elm_alm_py.oslc import get_catalog_url, get_resource, query_resources
 
 
 @pytest.mark.asyncio
@@ -46,7 +48,7 @@ async def test_catalog_malformed_xml():
         resp = httpx.Response(200, text="<not-valid-xml>", request=httpx.Request("GET", "http://test"))
         client.get.return_value = resp
         mock_client.return_value = client
-        with pytest.raises(Exception):  # ET.ParseError or ValueError
+        with pytest.raises((ET.ParseError, ValueError)):  # malformed/unexpected XML
             await get_catalog_url("rm")
 
 

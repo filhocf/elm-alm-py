@@ -1,7 +1,7 @@
 """Tests for Jazz form-based authentication."""
 
-import pytest
 import httpx
+import pytest
 import respx
 
 from elm_alm_py.auth import _authenticate, close_client
