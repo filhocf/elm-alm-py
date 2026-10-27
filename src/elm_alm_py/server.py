@@ -1,6 +1,9 @@
 """MCP server for IBM ELM (Engineering Lifecycle Management)."""
 
+import functools
 import logging
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -14,8 +17,33 @@ mcp = MCPServer("elm-alm-py", instructions="IBM ELM (DOORS Next, RTC, ETM) via O
 
 VALID_DOMAINS = ("rm", "ccm", "qm")
 
+_T = TypeVar("_T")
 
-@mcp.tool()
+
+def tool(func: Callable[..., Awaitable[_T]]) -> Callable[..., Awaitable[_T]]:
+    """Register an async MCP tool, translating domain errors into ToolError.
+
+    OSLC/discovery failures surface from oslc.py as ValueError/RuntimeError
+    (e.g. "Project not found", "No query capability found"). Without this wrap
+    the MCPServer rewraps them as UnexpectedToolError and the diagnostic message
+    is dropped — the client only sees "Error executing tool <name>". Re-raising
+    as ToolError preserves the message for the user. oslc.py stays free of any
+    MCP SDK dependency (the translation happens here, at the tool boundary).
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except ToolError:
+            raise
+        except (ValueError, RuntimeError) as exc:
+            raise ToolError(str(exc)) from exc
+
+    return mcp.tool()(wrapper)
+
+
+@tool
 async def list_projects(domain: str) -> list[dict]:
     """List projects for a domain (rm=DOORS Next, ccm=RTC, qm=ETM)."""
     domain = domain.lower()
@@ -24,19 +52,19 @@ async def list_projects(domain: str) -> list[dict]:
     return await oslc.list_service_providers(domain)
 
 
-@mcp.tool()
+@tool
 async def search_requirements(project: str, query: str | None = None) -> list[dict]:
     """Search requirements in a DOORS Next project. Query uses oslc.where syntax."""
     return await oslc.query_resources("rm", project, query)
 
 
-@mcp.tool()
+@tool
 async def get_requirement(uri: str) -> dict:
     """Get a single requirement by its OSLC URI."""
     return await oslc.get_resource(uri)
 
 
-@mcp.tool()
+@tool
 async def list_workitems(project: str, query: str | None = None) -> list[dict]:
     """Search work items in an RTC project. Query uses oslc.where syntax."""
     select = "dcterms:title,dcterms:identifier,dcterms:type,oslc_cm:status,dcterms:contributor"
@@ -60,14 +88,14 @@ async def list_workitems(project: str, query: str | None = None) -> list[dict]:
     return parsed
 
 
-@mcp.tool()
+@tool
 async def get_workitem(id: str) -> dict:
     """Get a single work item by ID (constructs URI from CCM base)."""
     uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
     return await oslc.get_resource(uri)
 
 
-@mcp.tool()
+@tool
 async def search_testcases(project: str, query: str | None = None) -> list[dict]:
     """Search test cases in an ETM project. Query uses oslc.where syntax."""
     return await oslc.query_resources("qm", project, query)
@@ -79,7 +107,7 @@ TYPE_IDS = {
 }
 
 
-@mcp.tool()
+@tool
 async def list_iterations(project: str) -> list[dict]:
     """List iterations (sprints/releases) for an RTC project with title and dates."""
     project_url = await oslc._resolve_project_url("ccm", project)
@@ -111,7 +139,7 @@ async def list_iterations(project: str) -> list[dict]:
     return iterations
 
 
-@mcp.tool()
+@tool
 async def get_plan_items(project: str, plan: str | None = None, item_ids: list[str] | None = None) -> dict:
     """Get hierarchical view of Items de Backlog with their child Tarefas expanded.
 
@@ -211,7 +239,7 @@ async def get_plan_items(project: str, plan: str | None = None, item_ids: list[s
     return result
 
 
-@mcp.tool()
+@tool
 async def create_workitem(
     project: str,
     title: str,
@@ -267,7 +295,7 @@ async def create_workitem(
     return await oslc.create_resource("ccm", project, payload, wi_type=type)
 
 
-@mcp.tool()
+@tool
 async def update_workitem(
     id: str,
     title: str | None = None,
@@ -309,7 +337,7 @@ async def update_workitem(
     return await oslc.update_resource(uri, payload)
 
 
-@mcp.tool()
+@tool
 async def add_child_workitem(
     parent_id: str,
     title: str,
@@ -329,7 +357,7 @@ async def add_child_workitem(
     )
 
 
-@mcp.tool()
+@tool
 async def transition_workitem(id: str, action: str) -> str:
     """Transition a work item's workflow state.
 
