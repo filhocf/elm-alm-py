@@ -24,7 +24,7 @@ Enquanto ficarmos em 1.x:
 ## Features
 
 - [ ] **F1:** Migrar o servidor de `FastMCP` para `MCPServer` (mcp 2.x), preservando
-  as 10 tools e o comportamento observável.
+  as 12 tools e o comportamento observável.
 - [ ] **F2:** Adotar `ToolError` para erros user-facing nas tools (fecha audit #13),
   substituindo `ValueError`/`RuntimeError` nos 11 pontos atuais.
 - [ ] **F3:** Remover o pin `<2` e fixar o piso em 2.x (`mcp>=2.3,<3`).
@@ -33,7 +33,7 @@ Enquanto ficarmos em 1.x:
 
 ## Critérios de Aceitação (EARS)
 
-- **Ubiquitous:** The system shall expose the same 10 MCP tools with unchanged names,
+- **Ubiquitous:** The system shall expose the same 12 MCP tools with unchanged names,
   parameters and return shapes after the migration.
 - **Event-driven:** When a tool receives invalid input (invalid domain, unknown type,
   missing fields, invalid action), the system shall raise `ToolError` with a

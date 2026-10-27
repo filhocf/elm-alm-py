@@ -79,7 +79,7 @@ Cobertura atual: 69% total, `oslc.py` 67%. Faltam ~1–3 p.p. Alvos de teste no 
 
 ## Regras de Negócio (invariantes)
 
-1. As 10 tools mantêm nome, parâmetros e shape de retorno (F1 — compat).
+1. As 12 tools mantêm nome, parâmetros e shape de retorno (F1 — compat).
 2. Erro de input de tool → `ToolError` com mensagem legível (F2).
 3. `serve` sobe em stdio sem `ModuleNotFoundError` (F1).
 4. CI verde em 3.10–3.13 com cobertura ≥70% (F4).
