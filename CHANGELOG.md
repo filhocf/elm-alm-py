@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `get_plan_items` tool — hierarchical sprint view returning backlog items with their child tasks expanded in a single call, selected by `item_ids` or by `plan` (iteration title substring) (#26)
+- `transition_workitem` tool — move a work item through its workflow (`start`, `resolve`, `close`, `reopen`), discovering the target state from the work item's workflow actions (#25)
+
+### Changed
+
+- `list_workitems` requests key fields via `oslc.select` and returns `id`, `title`, `type`, `status` and `owner` inline instead of bare resource URIs (#23)
+
+### Fixed
+
+- Pin `mcp<2`: mcp 2.x removed `mcp.server.fastmcp`, so `elm-alm-py serve` crashed on startup with `ModuleNotFoundError`
+- `create_workitem` no longer fails with HTTP 500 after an idle session: the session is refreshed before the POST, with re-authentication on 401/403 (#24)
+
+## [0.3.0] - 2026-05-22
+
+### Added
+
+- `update_workitem` accepts `owner`, `estimate_hours`, `planned_for` and `custom_fields` (#20)
+- `list_iterations` tool — list a project's sprints/releases with title, start/end dates and URI (#11)
+- `docs/USAGE.md` with working OSLC query patterns, examples and known limitations (#13)
+
+### Changed
+
+- README rewritten to cover write operations, `custom_fields` and OSLC details
+
+### Fixed
+
+- Current-iteration discovery picks the iteration whose start/end dates contain today, preferring bounded iterations over open-ended ones (#19)
+
+## [0.2.3] - 2026-05-22
+
+Tagged but not published to PyPI (package version was not bumped); these changes first shipped in 0.3.0.
+
+### Fixed
+
+- `create_workitem` POSTs directly to the project's `/ccm/oslc/contexts/{projectAreaId}/workitems` endpoint instead of relying on creation-factory discovery (#15, #17)
+- Extract `projectAreaId` correctly from project URLs ending in `/workitems/services.xml`
+
+## [0.2.2] - 2026-05-22
+
+Tagged but not published to PyPI (package version was not bumped); these changes first shipped in 0.3.0.
+
+### Added
+
+- `custom_fields` parameter on `create_workitem` for project-specific RDF fields
+- `create_workitem` sets `plannedFor` to the project's current iteration automatically
+
 ## [0.2.1] - 2026-05-22
 
 ### Fixed
