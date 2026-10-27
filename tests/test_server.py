@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 from elm_alm_py.server import list_projects, mcp, transition_workitem
 
@@ -10,7 +11,7 @@ VALID_DOMAINS = ("rm", "ccm", "qm")
 
 
 async def test_list_projects_invalid_domain():
-    with pytest.raises(ValueError, match="Invalid domain"):
+    with pytest.raises(ToolError, match="Invalid domain"):
         await list_projects("invalid")
 
 
@@ -37,8 +38,8 @@ def test_transition_workitem_registered():
 
 @pytest.mark.asyncio
 async def test_transition_workitem_invalid_action():
-    """Invalid action should raise ValueError."""
-    with pytest.raises(ValueError, match="Invalid action"):
+    """Invalid action should raise ToolError."""
+    with pytest.raises(ToolError, match="Invalid action"):
         await transition_workitem(id="12345", action="invalid")
 
 

@@ -3,6 +3,7 @@
 import httpx
 import pytest
 import respx
+from mcp.server.mcpserver.exceptions import ToolError
 
 from elm_alm_py import oslc
 from elm_alm_py.auth import close_client
@@ -161,12 +162,12 @@ async def test_add_child_workitem_tool():
 
 
 async def test_create_workitem_invalid_type():
-    with pytest.raises(ValueError, match="Invalid type"):
+    with pytest.raises(ToolError, match="Invalid type"):
         await create_workitem(project="MIR", title="X", type="epic")
 
 
 async def test_update_workitem_no_fields():
-    with pytest.raises(ValueError, match="At least one field"):
+    with pytest.raises(ToolError, match="At least one field"):
         await update_workitem(id="1")
 
 
