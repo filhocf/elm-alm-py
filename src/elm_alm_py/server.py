@@ -135,14 +135,16 @@ async def get_plan_items(project: str, plan: str | None = None, item_ids: list[s
         iterations = await list_iterations(project)
         matched = [i for i in iterations if plan.lower() in i["title"].lower()]
         if not matched:
-            return {"error": f"No iteration matching '{plan}'", "available": [i["title"] for i in iterations if i["start_date"]]}
+            return {
+                "error": f"No iteration matching '{plan}'",
+                "available": [i["title"] for i in iterations if i["start_date"]],
+            }
         iteration_info = matched[0]
         iter_uri = iteration_info["uri"]
 
         # Get all IBs (type=story) and filter by plannedFor
         all_items = await oslc.query_resources(
-            "ccm", project, None,
-            select="dcterms:title,dcterms:identifier,dcterms:type"
+            "ccm", project, None, select="dcterms:title,dcterms:identifier,dcterms:type"
         )
         ib_ids_to_fetch = []
         for item in all_items:
@@ -183,15 +185,17 @@ async def get_plan_items(project: str, plan: str | None = None, item_ids: list[s
         if isinstance(owner, dict):
             owner = owner.get("rdf:resource", "").split("/")[-1]
 
-        result_items.append({
-            "id": ib_id,
-            "type": "Item de Backlog",
-            "title": full.get("dcterms:title", ""),
-            "status": status,
-            "owner": owner,
-            "children_count": len(children),
-            "children": children,
-        })
+        result_items.append(
+            {
+                "id": ib_id,
+                "type": "Item de Backlog",
+                "title": full.get("dcterms:title", ""),
+                "status": status,
+                "owner": owner,
+                "children_count": len(children),
+                "children": children,
+            }
+        )
 
     result = {"items_count": len(result_items), "items": result_items}
     if iteration_info:

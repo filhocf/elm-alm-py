@@ -77,7 +77,9 @@ async def test_list_workitems():
         mock.return_value = [{"dcterms:title": "Bug #123", "dcterms:identifier": "123", "rdf:about": "http://x"}]
         result = await list_workitems("MIR", "oslc_cm:type='defect'")
         mock.assert_called_once_with(
-            "ccm", "MIR", "oslc_cm:type='defect'",
+            "ccm",
+            "MIR",
+            "oslc_cm:type='defect'",
             select="dcterms:title,dcterms:identifier,dcterms:type,oslc_cm:status,dcterms:contributor",
         )
         assert len(result) == 1

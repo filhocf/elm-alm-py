@@ -157,9 +157,7 @@ async def _resolve_project_url(domain: str, project_name: str) -> str:
     raise ValueError(f"Project '{project_name}' not found. Available: {available}")
 
 
-async def query_resources(
-    domain: str, project: str, where: str | None = None, select: str | None = None
-) -> list[dict]:
+async def query_resources(domain: str, project: str, where: str | None = None, select: str | None = None) -> list[dict]:
     """Execute an OSLC query on a project, returning JSON results."""
     project_url = await _resolve_project_url(domain, project)
     query_base = await _find_query_base(domain, project_url)
@@ -398,9 +396,7 @@ async def create_resource(domain: str, project: str, payload: dict, wi_type: str
         "OSLC-Core-Version": "2.0",
     }
     resp = await client.post(creation_url, content=rdfxml_body, headers=post_headers)
-    if resp.status_code in (401, 403) or "j_security_check" in str(
-        resp.headers.get("location", "")
-    ):
+    if resp.status_code in (401, 403) or "j_security_check" in str(resp.headers.get("location", "")):
         from .auth import _authenticate
 
         await _authenticate(client)
