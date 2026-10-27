@@ -1,14 +1,15 @@
 """Tests for MCP tools — mocked OSLC responses."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from elm_alm_py.server import (
-    list_projects,
-    search_requirements,
     get_requirement,
-    list_workitems,
     get_workitem,
+    list_projects,
+    list_workitems,
+    search_requirements,
     search_testcases,
 )
 

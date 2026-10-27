@@ -1,6 +1,7 @@
 """Configuration for ELM connection."""
 
 import base64
+import binascii
 import json
 import os
 
@@ -25,7 +26,8 @@ def _decode_password(value: str) -> str:
         # Heuristic: if decoded is printable ASCII, it was base64
         if decoded.isprintable():
             return decoded
-    except Exception:
+    except (binascii.Error, ValueError, UnicodeDecodeError):
+        # Not valid base64 (plaintext password) — fall through and return as-is.
         pass
     return value
 
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
 
     model_config = {"env_prefix": "", "env_file": ".env"}
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, context, /) -> None:
         # Load from ~/.elm_creds.json as fallback
         if not self.elm_user:
             creds = _load_creds_file()

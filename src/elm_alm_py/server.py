@@ -1,9 +1,13 @@
 """MCP server for IBM ELM (Engineering Lifecycle Management)."""
 
+import logging
+
 from mcp.server.fastmcp import FastMCP
 
 from . import oslc
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 mcp = FastMCP("elm-alm-py", instructions="IBM ELM (DOORS Next, RTC, ETM) via OSLC")
 
@@ -161,7 +165,8 @@ async def get_plan_items(project: str, plan: str | None = None, item_ids: list[s
     for ib_id in ib_ids_to_fetch:
         try:
             full = await get_workitem(ib_id)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 — skip unreadable items, keep building the plan
+            logger.debug("get_plan_items: skipping work item %s (%s)", ib_id, exc)
             continue
 
         # If filtering by iteration, check plannedFor

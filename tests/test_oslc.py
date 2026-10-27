@@ -1,7 +1,7 @@
 """Tests for OSLC service discovery and queries."""
 
-import pytest
 import httpx
+import pytest
 import respx
 
 from elm_alm_py import oslc

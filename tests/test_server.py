@@ -1,9 +1,10 @@
 """Tests for MCP server tool registration."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from elm_alm_py.server import mcp, list_projects, transition_workitem
+import pytest
+
+from elm_alm_py.server import list_projects, mcp, transition_workitem
 
 VALID_DOMAINS = ("rm", "ccm", "qm")
 

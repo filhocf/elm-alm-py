@@ -1,11 +1,14 @@
 """OSLC service discovery and query builder for IBM ELM."""
 
+import logging
 from xml.etree import ElementTree as ET
 
 import httpx
 
 from .auth import get_client
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 # OSLC XML namespaces (ELM 7.x uses OSLC 1.0 namespaces in rootservices)
 NS = {
@@ -130,7 +133,8 @@ async def _find_query_base(domain: str, project_url: str) -> str:
     for url in urls_to_try:
         try:
             sp = await _get_xml(client, url)
-        except Exception:
+        except (httpx.HTTPError, ET.ParseError) as exc:
+            logger.debug("OSLC discovery: skipping %s (%s)", url, exc)
             continue
         for qc in sp.iter(f"{{{NS['oslc']}}}QueryCapability"):
             rt_el = qc.find(f"{{{NS['oslc']}}}resourceType")
@@ -172,7 +176,7 @@ async def query_resources(domain: str, project: str, where: str | None = None, s
     # If query_base already has query params (e.g., RM /views?oslc.query=true&projectURL=...),
     # merge our params into the existing URL
     if "?" in query_base:
-        from urllib.parse import urlparse, parse_qs, urlunparse
+        from urllib.parse import parse_qs, urlparse, urlunparse
 
         parsed = urlparse(query_base)
         existing_params = parse_qs(parsed.query, keep_blank_values=True)
@@ -242,10 +246,8 @@ async def _find_default_category(project_url: str) -> str | None:
             first = members[0]
             # Return the rdf:about URI of the category
             return first.get("rdf:about", first.get("rdf:resource"))
-    except Exception as exc:
-        import logging
-
-        logging.getLogger(__name__).debug("Iteration discovery failed: %s", exc)
+    except Exception as exc:  # noqa: BLE001 — discovery is best-effort, degrade to None
+        logger.debug("Iteration discovery failed: %s", exc)
     return None
 
 
@@ -291,10 +293,8 @@ async def _find_current_iteration(project_url: str) -> str | None:
             candidates.sort(key=lambda x: (x[2], x[1]), reverse=True)
             return candidates[0][0]
         return None
-    except Exception as exc:
-        import logging
-
-        logging.getLogger(__name__).debug("Iteration discovery failed: %s", exc)
+    except Exception as exc:  # noqa: BLE001 — discovery is best-effort, degrade to None
+        logger.debug("Iteration discovery failed: %s", exc)
     return None
 
 
@@ -312,7 +312,8 @@ async def _find_creation_factory(domain: str, project_url: str, wi_type: str | N
     for url in urls_to_try:
         try:
             sp = await _get_xml(client, url)
-        except Exception:
+        except (httpx.HTTPError, ET.ParseError) as exc:
+            logger.debug("OSLC discovery: skipping %s (%s)", url, exc)
             continue
 
         # Collect all matching creation factories
