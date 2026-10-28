@@ -425,6 +425,46 @@ async def transition_workitem(id: str, action: str) -> str:
     return f"Work item {id} transitioned to '{action}' (state: {target_state_uri})"
 
 
+@tool
+async def create_requirement(
+    project: str,
+    title: str,
+    content: str,
+    folder: str | None = None,
+    type: str | None = None,
+) -> dict:
+    """Create a requirement in a DOORS Next (RM) project via OSLC.
+
+    The HTML content is sanitized to XHTML and stored in jazz_rm:primaryText.
+
+    Args:
+        project: RM project name (e.g., "MY RM PROJECT")
+        title: Requirement title (required)
+        content: HTML content (sanitized to XHTML for primaryText)
+        folder: Folder URI to link the requirement to (nav:parent), optional
+        type: instanceShape URI for the requirement type, optional. MVP: a URI,
+            not a type name — shape discovery depends on SPEC-discovery-tools.
+    """
+    xhtml = oslc.sanitize_html_to_xhtml(content)
+    return await oslc.create_requirement(project, title, xhtml, folder=folder, shape=type)
+
+
+@tool
+async def update_requirement(
+    uri: str,
+    title: str | None = None,
+    content: str | None = None,
+) -> dict:
+    """Update a requirement in DOORS Next (RM) via OSLC PUT with ETag.
+
+    Args:
+        uri: OSLC URI of the requirement to update
+        title: New title (optional)
+        content: New HTML content, sanitized to XHTML (optional)
+    """
+    return await oslc.update_requirement(uri, title=title, xhtml=content)
+
+
 def main():
     """Entry point for the MCP server."""
     mcp.run(transport="stdio")

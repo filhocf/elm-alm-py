@@ -1,6 +1,6 @@
 # SPEC — RM create/update requirement (escrita no DOORS Next)
 
-**Status:** PLANNED (G0) · **Release:** v0.6.0 · **RFC-mãe:** RFC-001 §5
+**Status:** DONE (G5) · **Release:** v0.5.0 · **RFC-mãe:** RFC-001 §5
 **Pesquisa:** `pesquisa-apis-elm.md §2` · `levantamento-interno-alm.md §A.6/§B.7`
 **Classe:** entregável de produto — maior gap da membrana DAIA
 
@@ -17,6 +17,13 @@ hoje o elm-mcp lê RM mas não cria/atualiza. O jandaia já faz via `publicar_el
 - Tool `update_requirement(uri, title=None, content=None, custom_fields=None)` — PUT com ETag.
 - Descoberta do shape do tipo de requisito via discovery (depende de `SPEC-discovery-tools`).
 - Core genérico: nenhum tipo (HF/EL/ET/REG) hardcoded — vêm do perfil de adaptação / discovery.
+
+### Decisão de MVP (G0, 28/out): escrita RM independe do discovery
+O G0 (`G0-rm-write.md`) recomendou caminho RM **separado/aditivo** (não estender `create_resource`/
+`_payload_to_rdfxml` do CCM — são o gargalo único da escrita CCM, risco de regressão alto). E:
+`type → instanceShape` depende de `SPEC-discovery-tools`, que não está pronto. Decisão: o MVP de
+escrita RM funciona **sem** shape (cria requisito base) e aceita `type`/`folder` como **URI opcional**;
+quando o discovery existir, `type` por nome passa a resolver o shape. Não bloquear o write pelo discovery.
 
 ## Critério de aceite (EARS)
 

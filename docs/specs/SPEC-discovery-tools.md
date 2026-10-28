@@ -1,6 +1,6 @@
 # SPEC — Discovery tools (shapes, campos, pastas, inspeção)
 
-**Status:** PLANNED (G0) · **Release:** v0.6.0 · **RFC-mãe:** RFC-001 §4/§5 · **ADR:** ADR-003
+**Status:** PLANNED (G0) · **Release:** v0.5.0 · **RFC-mãe:** RFC-001 §4/§5 · **ADR:** ADR-003
 **Pesquisa:** `levantamento-interno-alm.md §A.2/A.3/A.4/A.11` · **Classe:** base da camada de adaptação
 
 ## Meta
