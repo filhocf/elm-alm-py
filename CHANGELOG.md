@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+### Added
+
+- `create_requirement` tool — create a requirement in DOORS Next (RM) via OSLC; HTML content is
+  sanitized to XHTML and stored in `jazz_rm:primaryText`; optional `folder` (nav:parent) and `type`
+  (instanceShape URI).
+- `update_requirement` tool — update an RM requirement (title/content) via OSLC PUT with ETag; a 412
+  conflict surfaces as a readable `ToolError`.
+
 ## [0.4.0] - 2026-10-28
 
 Renamed from `elm-alm-py` to **`elm-mcp`** and professionalized into a first-class OSS project.

@@ -1,7 +1,9 @@
 """OSLC service discovery and query builder for IBM ELM."""
 
 import logging
+import re as _re
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 
 import httpx
 
@@ -385,3 +387,260 @@ async def update_resource(uri: str, payload: dict) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+# =====================================================================
+# RM (DOORS Next) write path — ADDITIVE (G0-rm-write.md §E).
+# Fully separate from the CCM create_resource/_payload_to_rdfxml path to
+# avoid regression on the single write gargalo of CCM. Uses regex (not ET)
+# for RM discovery — ET fails in the MCP stdio context (memória 0c1b2aa4).
+# =====================================================================
+
+# RM-specific namespaces (jazz_rm:primaryText, nav:parent). Additive to NS.
+NS["jazz_rm"] = "http://jazz.net/ns/rm#"
+NS["nav"] = "http://jazz.net/ns/rm/navigation#"
+
+# RDF/XML namespace block for RM requirement bodies (own block — does NOT touch
+# the CCM _payload_to_rdfxml ns_map).
+_RM_NS_DECLS = (
+    'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" '
+    'xmlns:dcterms="http://purl.org/dc/terms/" '
+    'xmlns:oslc="http://open-services.net/ns/core#" '
+    'xmlns:oslc_rm="http://open-services.net/ns/rm#" '
+    'xmlns:jazz_rm="http://jazz.net/ns/rm#" '
+    'xmlns:nav="http://jazz.net/ns/rm/navigation#"'
+)
+
+_RM_REQUIREMENT_TYPE = "http://open-services.net/ns/rm#Requirement"
+
+
+def sanitize_html_to_xhtml(html: str) -> str:
+    """Convert HTML to XHTML valid for the RM primaryText.
+
+    Mirrors publicar_elm.sanitizar_html (G0 §E pt.4): strip html/head/body/meta
+    wrappers, close void tags (br/hr/img/input), escape lone ampersands without
+    double-escaping existing entities, and drop emojis that break the ALM XML.
+    """
+    if not html:
+        return ""
+    content = html
+    # Remove html/head/body/meta wrappers
+    content = _re.sub(r"<html[^>]*>", "", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"</html>", "", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"<head[^>]*>.*?</head>", "", content, flags=_re.IGNORECASE | _re.DOTALL)
+    content = _re.sub(r"<body[^>]*>", "", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"</body>", "", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"<meta[^>]*/?>", "", content, flags=_re.IGNORECASE)
+    # Close void tags for XHTML
+    content = _re.sub(r"<hr\s*/?>", "<hr/>", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"<br\s*/?>", "<br/>", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"<img([^>]*?)/?>", r"<img\1/>", content, flags=_re.IGNORECASE)
+    content = _re.sub(r"<input([^>]*?)/?>", r"<input\1/>", content, flags=_re.IGNORECASE)
+    # Escape lone ampersands (not already-encoded entities) — no double-escape
+    content = _re.sub(r"&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)", "&amp;", content)
+    # Drop emojis (break ALM XML)
+    content = _re.sub(r"[\U0001F600-\U0001F9FF]", "", content)
+    content = _re.sub(r"[\u2600-\u27BF]", "", content)
+    content = _re.sub(r"[\U0001FA00-\U0001FA6F]", "", content)
+    content = _re.sub(r"[\U0001F300-\U0001F5FF]", "", content)
+    return content.strip()
+
+
+async def _find_requirement_factory(project_url: str) -> str:
+    """Discover the RM CreationFactory URL (oslc:creation) for a service provider.
+
+    Mirrors publicar_elm.descobrir_creation_factory: finds the CreationFactory
+    whose oslc:resourceType is rm#Requirement and returns its oslc:creation URI.
+    Uses regex (not ElementTree) — ET fails in the MCP stdio context.
+    """
+    client = await get_client()
+    resp = await client.get(
+        project_url,
+        headers={"Accept": "application/rdf+xml, application/xml", "OSLC-Core-Version": "2.0"},
+    )
+    resp.raise_for_status()
+    xml_text = resp.text
+
+    # Match each CreationFactory block, then pick the one whose resourceType is
+    # EXACTLY rm#Requirement — not a substring match, which would also accept
+    # rm#RequirementCollection (DOORS Next exposes both). Mistake note ed14f77c.
+    for block in _re.findall(r"<\w*:?CreationFactory\b.*?</\w*:?CreationFactory>", xml_text, _re.DOTALL):
+        rt = _re.search(r"<\w*:?resourceType\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        if rt is None or rt.group(1) != _RM_REQUIREMENT_TYPE:
+            continue
+        m = _re.search(r"<\w*:?creation\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        if m:
+            return m.group(1)
+    raise ValueError(f"RM CreationFactory for Requirement not found in '{project_url}'")
+
+
+def _assert_xhtml_wellformed(xhtml: str) -> None:
+    """Reject XHTML content that is not well-formed, to prevent it from breaking
+    out of the jazz_rm:primaryText literal (XML injection). The content goes in
+    non-escaped (parseType="Literal"), so a stray </jazz_rm:primaryText> or
+    unbalanced tag could inject sibling structure. Parse it in isolation first.
+    """
+    if not xhtml:
+        return
+    fragment = f'<div xmlns="http://www.w3.org/1999/xhtml">{xhtml}</div>'
+    try:
+        ET.fromstring(fragment)
+    except ET.ParseError as exc:
+        raise ValueError(f"requirement content is not well-formed XHTML: {exc}") from exc
+
+
+def _requirement_to_rdfxml(title: str, xhtml: str, shape: str | None = None, folder: str | None = None) -> str:
+    """Build the RM requirement RDF/XML body.
+
+    The XHTML is embedded NON-escaped inside jazz_rm:primaryText with
+    rdf:parseType="Literal" (different from the CCM _payload_to_rdfxml, which
+    escapes everything). Title is escaped (it is plain text, not markup).
+    The XHTML must be well-formed (checked by the caller) so it cannot break out
+    of the literal.
+    """
+    shape_tag = f'    <oslc:instanceShape rdf:resource="{shape}"/>\n' if shape else ""
+    folder_tag = f'    <nav:parent rdf:resource="{folder}"/>\n' if folder else ""
+    primary_text = ""
+    if xhtml:
+        primary_text = (
+            '    <jazz_rm:primaryText rdf:parseType="Literal">'
+            '<div xmlns="http://www.w3.org/1999/xhtml">'
+            f"{xhtml}</div></jazz_rm:primaryText>\n"
+        )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        f"<rdf:RDF {_RM_NS_DECLS}>\n"
+        '  <rdf:Description rdf:about="">\n'
+        f'    <rdf:type rdf:resource="{_RM_REQUIREMENT_TYPE}"/>\n'
+        f"    <dcterms:title>{_xml_escape(title)}</dcterms:title>\n"
+        f"{shape_tag}"
+        f"{primary_text}"
+        f"{folder_tag}"
+        "  </rdf:Description>\n"
+        "</rdf:RDF>"
+    )
+
+
+def _extract_identifier(xml_text: str) -> str | None:
+    """Pull dcterms:identifier out of an RM response body (regex)."""
+    if not xml_text:
+        return None
+    m = _re.search(r"<\w*:?identifier[^>]*>([^<]+)</\w*:?identifier>", xml_text)
+    return m.group(1) if m else None
+
+
+async def create_requirement(
+    project: str, title: str, xhtml: str, folder: str | None = None, shape: str | None = None
+) -> dict:
+    """Create an RM requirement via OSLC POST to the requirementFactory.
+
+    Resolves the project, discovers the factory, sanitizes nothing here (the
+    caller passes already-sanitized XHTML), builds the RDF/XML, and POSTs it
+    (Accept/Content-Type application/rdf+xml). Accepts 200 or 201. Retries once
+    on 401/403 after a session refresh (same pattern as create_resource).
+    Returns {"uri": ..., "identifier": ...}. Raises ValueError if the project
+    does not exist (propagated from _resolve_project_url).
+    """
+    project_url = await _resolve_project_url("rm", project)
+    factory_url = await _find_requirement_factory(project_url)
+    _assert_xhtml_wellformed(xhtml)
+    rdf_body = _requirement_to_rdfxml(title, xhtml, shape=shape, folder=folder)
+    client = await get_client()
+    post_headers = {
+        "Content-Type": "application/rdf+xml",
+        "Accept": "application/rdf+xml",
+        "OSLC-Core-Version": "2.0",
+    }
+    resp = await client.post(factory_url, content=rdf_body.encode("utf-8"), headers=post_headers)
+    if resp.status_code in (401, 403) or "j_security_check" in str(resp.headers.get("location", "")):
+        from .auth import _authenticate
+
+        await _authenticate(client)
+        resp = await client.post(factory_url, content=rdf_body.encode("utf-8"), headers=post_headers)
+    if resp.status_code not in (200, 201):
+        resp.raise_for_status()
+        raise RuntimeError(f"Expected 200/201 Created, got {resp.status_code}")
+    location = resp.headers.get("Location", "")
+    identifier = _extract_identifier(resp.text)
+    return {"uri": location, "identifier": identifier}
+
+
+async def update_requirement(uri: str, title: str | None = None, xhtml: str | None = None) -> dict:
+    """Update an RM requirement via OSLC PUT with If-Match (ETag).
+
+    GETs the resource as rdf+xml for its ETag, edits the XML as a string
+    preserving parseType="Literal" (mirrors publicar_elm.atualizar_requisito),
+    then PUTs with If-Match. Accepts 200/204. On 412 raises ValueError signalling
+    an ETag conflict (the @tool boundary converts it to a legible ToolError).
+    """
+    client = await get_client()
+    get_resp = await client.get(
+        uri, headers={"Accept": "application/rdf+xml, application/xml", "OSLC-Core-Version": "2.0"}
+    )
+    get_resp.raise_for_status()
+    etag = get_resp.headers.get("ETag", "")
+    if not etag:
+        raise ValueError(f"Server did not return an ETag for resource '{uri}'. Cannot safely update.")
+    xml_content = get_resp.text
+    if xhtml is not None:
+        _assert_xhtml_wellformed(sanitize_html_to_xhtml(xhtml))
+
+    # Edit ONLY inside the target resource's <rdf:Description> block, not the
+    # first/any match in the whole document (a GET may return several Descriptions
+    # — linked resources, folders). Anchor on rdf:about matching the uri; fall
+    # back to the first Description if the server omits/abbreviates rdf:about.
+    desc_re = _re.compile(
+        r'(<\w*:?Description\b[^>]*rdf:about="' + _re.escape(uri) + r'"[^>]*>)(.*?)(</\w*:?Description>)',
+        _re.DOTALL,
+    )
+    m = desc_re.search(xml_content)
+    if m is None:
+        desc_re = _re.compile(r"(<\w*:?Description\b[^>]*>)(.*?)(</\w*:?Description>)", _re.DOTALL)
+        m = desc_re.search(xml_content)
+    if m is None:
+        raise ValueError(f"could not locate the requirement's rdf:Description in '{uri}'")
+
+    open_tag, body, close_tag = m.group(1), m.group(2), m.group(3)
+
+    if title is not None:
+        body = _re.sub(
+            r"(<\w*:?title[^>]*>)(.*?)(</\w*:?title>)",
+            lambda t: t.group(1) + _xml_escape(title) + t.group(3),
+            body,
+            count=1,
+            flags=_re.DOTALL,
+        )
+
+    if xhtml is not None:
+        clean = sanitize_html_to_xhtml(xhtml)
+        primary_content = f'<div xmlns="http://www.w3.org/1999/xhtml">{clean}</div>'
+        if "jazz_rm:primaryText" in body:
+            body = _re.sub(
+                r"(<jazz_rm:primaryText[^>]*>)(.*?)(</jazz_rm:primaryText>)",
+                lambda t: t.group(1) + primary_content + t.group(3),
+                body,
+                count=1,
+                flags=_re.DOTALL,
+            )
+        else:
+            primary_tag = f'<jazz_rm:primaryText rdf:parseType="Literal">{primary_content}</jazz_rm:primaryText>'
+            body = body + f"    {primary_tag}\n  "
+
+    xml_content = xml_content[: m.start()] + open_tag + body + close_tag + xml_content[m.end() :]
+
+    put_resp = await client.put(
+        uri,
+        content=xml_content.encode("utf-8"),
+        headers={
+            "Content-Type": "application/rdf+xml",
+            "Accept": "application/rdf+xml",
+            "OSLC-Core-Version": "2.0",
+            "If-Match": etag,
+        },
+    )
+    if put_resp.status_code == 412:
+        raise ValueError("conflito de ETag: o requisito foi alterado por outro cliente; recarregue e tente novamente")
+    if put_resp.status_code not in (200, 204):
+        put_resp.raise_for_status()
+        raise RuntimeError(f"Expected 200/204, got {put_resp.status_code}")
+    return {"uri": uri, "identifier": _extract_identifier(put_resp.text)}
