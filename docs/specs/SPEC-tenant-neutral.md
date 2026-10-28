@@ -1,6 +1,6 @@
 # SPEC — Tenant-neutral core
 
-**Status:** PLANNED (G0) · **Release:** v0.5.0 · **RFC-mãe:** RFC-001 §3 · **ADR:** ADR-003
+**Status:** DONE (G5) · **Release:** v0.4.0 · **RFC-mãe:** RFC-001 §3 · **ADR:** ADR-003
 **Pesquisa:** `levantamento-interno-alm.md §E` · **Classe:** produto + narrativa
 
 ## Meta

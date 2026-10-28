@@ -151,7 +151,7 @@ async def get_plan_items(project: str, plan: str | None = None, item_ids: list[s
     - plan: match iteration by title substring, then find IBs planned for it
 
     Args:
-        project: Project name (e.g., "MEU IMOVEL RURAL (MIR)")
+        project: Project name (e.g., "MY PROJECT (KEY)")
         plan: Iteration title substring to match (e.g., "Entrega 5"). Optional.
         item_ids: List of IB IDs to expand directly (e.g., ["622299", "622289"]). Optional.
     """
@@ -253,12 +253,12 @@ async def create_workitem(
     """Create a work item in an RTC project via OSLC.
 
     Args:
-        project: Project name (e.g., "MEU IMOVEL RURAL (MIR)")
+        project: Project name (e.g., "MY PROJECT (KEY)")
         title: Work item title (required)
         type: "task" or "story" (default: "task")
         description: HTML description (optional)
         parent_id: Parent work item ID (optional)
-        owner: Username of the owner (optional, e.g., "claudio.filho")
+        owner: Username of the owner (optional, e.g., "jdoe")
         filed_against: Category URI (optional). If not provided, discovers default from project.
         custom_fields: Dict of extra RDF fields to inject (e.g., {"rtc_ext:campo": "valor"})
     """
@@ -311,7 +311,7 @@ async def update_workitem(
         id: Work item ID (number)
         title: New title (optional)
         description: New description (optional)
-        owner: Username to assign (e.g., "claudio.filho")
+        owner: Username to assign (e.g., "jdoe")
         estimate_hours: Estimate in hours (e.g., 8 = 8h)
         planned_for: Iteration URI (e.g., from get_workitem response)
         custom_fields: Dict of extra fields to merge into PUT payload
@@ -341,10 +341,10 @@ async def update_workitem(
 async def add_child_workitem(
     parent_id: str,
     title: str,
+    project: str,
     type: str = "task",
     description: str | None = None,
     owner: str | None = None,
-    project: str = "MEU IMOVEL RURAL (MIR)",
 ) -> dict:
     """Create a child work item under a parent in an RTC project."""
     return await create_workitem(

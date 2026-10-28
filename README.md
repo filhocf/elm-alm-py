@@ -1,50 +1,73 @@
-# elm-mcp
+<h1 align="center">elm-mcp</h1>
 
-MCP server for **IBM Engineering Lifecycle Management (ELM)** — read and write access to DOORS Next (RM), RTC/EWM (CCM), and ETM (QM) via OSLC REST APIs.
+<p align="center"><strong>Bring IBM Engineering Lifecycle Management to your AI agent.</strong><br>
+An MCP server that reads and writes requirements, work items and test cases in IBM ELM
+over the open OSLC REST protocol — so an agent can work the ALM as a first-class tool.</p>
 
-Independent implementation over the open OSLC REST protocol — **not a fork** of IBM software, and vendor-neutral (no organization-specific values in the package). Tested against ELM 7.0.3.
+<p align="center">
+  <a href="https://pypi.org/project/elm-mcp/"><img src="https://img.shields.io/pypi/v/elm-mcp" alt="PyPI"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://github.com/filhocf/elm-mcp/actions/workflows/ci.yml"><img src="https://github.com/filhocf/elm-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
+---
+
+**elm-mcp** exposes IBM ELM's three OSLC domains — **DOORS Next (RM)**, **EWM/RTC (CCM)** and
+**ETM (QM)** — as MCP tools. An AI assistant (Kiro, Claude, OpenCode, Hermes, …) can then list
+projects, query and create requirements, work items and test cases, and move them through their
+workflow, without a human clicking through the Jazz web UI.
+
+It is an **independent implementation** over the open [OSLC](https://open-services.net/) REST
+protocol — **not a fork** of IBM software, and it does **not** bundle any IBM client library.
+The package is **vendor-neutral**: no organization-specific host, project or namespace is baked in;
+those come from your own configuration at runtime.
+
+## Why
+
+ALM tools like IBM ELM hold the official record — requirements, backlog, tests, traceability — but
+they live behind a web UI and OSLC APIs that an agent cannot use out of the box. elm-mcp is the
+bridge: it lets an agentic workflow read context from the ALM and write artifacts back to it, over
+the Model Context Protocol, so the agent and the traditional process share one source of truth.
 
 ## Install
 
+Run it with [`uv`](https://docs.astral.sh/uv/) — no clone, no manual virtualenv:
+
 ```bash
-uv pip install -e .
+uvx elm-mcp            # runs the MCP server (stdio)
 ```
 
-## Configuration
+Or install from PyPI:
 
-### Option 1: Credentials file (recommended)
+```bash
+pip install elm-mcp
+```
+
+## Configure
+
+One-time credential setup (interactive):
 
 ```bash
 elm-mcp login
 ```
 
-Saves to `~/.elm_creds.json`:
-```json
-{"url": "https://your-elm-server.example.com", "username": "user", "password": "base64encoded"}
-```
-
-### Option 2: Environment variables
+Or via environment variables:
 
 ```bash
-export ELM_URL=https://your-elm-server.example.com
+export ELM_URL=https://elm.company.com
 export ELM_USER=your_username
 export ELM_PASSWORD=secret
 ```
 
-## Usage
-
-```bash
-# As MCP server (stdio)
-elm-mcp
-```
-
-### MCP client configuration
+### Register with your MCP client
 
 ```json
 {
   "mcpServers": {
-    "elm-alm": {
-      "command": "/path/to/.venv/bin/elm-mcp"
+    "elm": {
+      "command": "uvx",
+      "args": ["elm-mcp"]
     }
   }
 }
@@ -52,96 +75,48 @@ elm-mcp
 
 ## Tools
 
-### Read Operations
+**Read:** `list_projects` · `search_requirements` · `get_requirement` · `list_workitems` ·
+`get_workitem` · `search_testcases` · `list_iterations` · `get_plan_items`
 
-| Tool | Description |
-|------|-------------|
-| `list_projects(domain)` | List projects for RM/CCM/QM |
-| `search_requirements(project, query?)` | OSLC query on RM requirements |
-| `get_requirement(uri)` | Get single requirement by URI |
-| `list_workitems(project, query?)` | OSLC query on CCM work items |
-| `get_workitem(id)` | Get single work item by ID |
-| `search_testcases(project, query?)` | OSLC query on QM test cases |
+**Write (CCM work items):** `create_workitem` · `update_workitem` · `add_child_workitem` ·
+`transition_workitem`
 
-### Write Operations
-
-| Tool | Description |
-|------|-------------|
-| `create_workitem(project, title, type?, ...)` | Create a work item (task/story/defect) |
-| `update_workitem(id, title?, description?)` | Update work item fields (ETag-based) |
-| `add_child_workitem(parent_id, title, ...)` | Create a child work item |
-
-#### create_workitem parameters
-
-| Parameter | Required | Description |
-|-----------|:--------:|-------------|
-| `project` | ✅ | Project name (e.g., "MY PROJECT (KEY)") |
-| `title` | ✅ | Work item title |
-| `type` | | "task" (default), "story", or "defect" |
-| `description` | | HTML description |
-| `parent_id` | | Parent work item ID (creates child link) |
-| `owner` | | Username (e.g., "jdoe") |
-| `filed_against` | | Category URI. Auto-discovered if not provided |
-| `custom_fields` | | Dict of extra RDF fields (see below) |
-
-#### custom_fields for project-specific attributes
-
-Some RTC projects require custom fields. Pass them as a dict:
+Full reference with signatures: [docs/TOOLS.md](docs/TOOLS.md). Query syntax and examples:
+[docs/USAGE.md](docs/USAGE.md).
 
 ```python
-custom_fields={
-    "rtc_ext:com.company.team.workitem.attribute.customattr": {
-        "rdf:resource": "https://elm.company.com/ccm/oslc/enumerations/{projectAreaId}/..."
-    }
-}
+# Example: create a task and move it to "start"
+create_workitem(project="MY PROJECT (KEY)", title="Wire up OSLC discovery", type="task")
+transition_workitem(id="12345", action="start")
 ```
 
-Values can be:
-- `{"rdf:resource": "uri"}` — for URI/enumeration fields
-- `"text"` — for literal text fields
+## How it works
 
-## OSLC API Details
+```
+MCP client → elm-mcp (MCPServer, stdio) → OSLC discovery + CRUD → IBM ELM (RM / CCM / QM)
+```
 
-### Work Item Types (CCM)
+Architecture, the generic-core vs. per-project adaptation layer, and design decisions are documented
+under [docs/](docs/): [ARCHITECTURE](docs/ARCHITECTURE.md) · [ADRs](docs/adr/) ·
+[roadmap](docs/roadmap.md).
 
-| Type | RTC type ID | calm:id in services.xml |
-|------|-------------|-------------------------|
-| task | `task` | `requirementChangeRequest` |
-| story | `com.ibm.team.apt.workItemType.story` | `planItem` |
-
-### Key Fields
-
-| Field | Namespace | Format |
-|-------|-----------|--------|
-| Title | `dcterms:title` | Text |
-| Type | `rtc_cm:type` | `rdf:resource` URI |
-| Category | `rtc_cm:filedAgainst` | `rdf:resource` (itemOid format) |
-| Iteration | `rtc_cm:plannedFor` | `rdf:resource` URI |
-| Owner | `dcterms:contributor` | `rdf:resource` `/jts/users/{login}` |
-| Estimate | `rtc_cm:estimate` | Integer (milliseconds) |
-| State | `rtc_cm:state` | `rdf:resource` URI |
-
-### Content Types
-
-- **Create (POST)**: `application/rdf+xml`
-- **Read (GET)**: `application/json` (Accept header)
-- **Update (PUT)**: `application/json` with `If-Match: {ETag}`
-
-## Development
+## Develop
 
 ```bash
 uv sync --group dev
 uv run pytest tests/ -v --cov=elm_mcp
-uv run ruff check src/ tests/
+uvx ruff@latest check src/ tests/
 ```
 
-## Notes
+Conventions (language, tenant-neutrality, EARS requirements, traceability) are in
+[docs/CONVENTIONS.md](docs/CONVENTIONS.md).
 
-- Category auto-discovery picks the first category of the project; pass `filed_against` explicitly when there is more than one.
-- OSLC CM 1.0 `services.xml` parsing is bypassed — the creation URL is constructed directly.
+## Status
 
-See [docs/USAGE.md](docs/USAGE.md) for query syntax and more examples.
+Early but structured. Core read + CCM work-item write is working; requirement write (RM), discovery
+tools, OSLC links, test write (QM) and reporting are on the [roadmap](docs/roadmap.md).
+Tested against IBM ELM 7.0.3.
 
 ## License
 
-MIT
+[MIT](LICENSE)

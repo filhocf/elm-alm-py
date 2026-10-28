@@ -18,9 +18,9 @@ from elm_mcp.server import (
 @pytest.mark.asyncio
 async def test_list_projects_rm():
     with patch("elm_mcp.server.oslc.list_service_providers", new_callable=AsyncMock) as mock:
-        mock.return_value = [{"title": "MIR", "url": "http://elm/rm/sp/1"}]
+        mock.return_value = [{"title": "PROJ", "url": "http://elm/rm/sp/1"}]
         result = await list_projects("rm")
-        assert result == [{"title": "MIR", "url": "http://elm/rm/sp/1"}]
+        assert result == [{"title": "PROJ", "url": "http://elm/rm/sp/1"}]
         mock.assert_called_once_with("rm")
 
 
@@ -50,8 +50,8 @@ async def test_list_projects_invalid_domain_raises():
 async def test_search_requirements_with_query():
     with patch("elm_mcp.server.oslc.query_resources", new_callable=AsyncMock) as mock:
         mock.return_value = [{"title": "REQ-001", "uri": "http://elm/rm/req/1"}]
-        result = await search_requirements("MIR", "dcterms:title='REQ-001'")
-        mock.assert_called_once_with("rm", "MIR", "dcterms:title='REQ-001'")
+        result = await search_requirements("PROJ", "dcterms:title='REQ-001'")
+        mock.assert_called_once_with("rm", "PROJ", "dcterms:title='REQ-001'")
         assert result[0]["title"] == "REQ-001"
 
 
@@ -59,8 +59,8 @@ async def test_search_requirements_with_query():
 async def test_search_requirements_no_query():
     with patch("elm_mcp.server.oslc.query_resources", new_callable=AsyncMock) as mock:
         mock.return_value = []
-        result = await search_requirements("MIR", None)
-        mock.assert_called_once_with("rm", "MIR", None)
+        result = await search_requirements("PROJ", None)
+        mock.assert_called_once_with("rm", "PROJ", None)
         assert result == []
 
 
@@ -77,10 +77,10 @@ async def test_get_requirement():
 async def test_list_workitems():
     with patch("elm_mcp.server.oslc.query_resources", new_callable=AsyncMock) as mock:
         mock.return_value = [{"dcterms:title": "Bug #123", "dcterms:identifier": "123", "rdf:about": "http://x"}]
-        result = await list_workitems("MIR", "oslc_cm:type='defect'")
+        result = await list_workitems("PROJ", "oslc_cm:type='defect'")
         mock.assert_called_once_with(
             "ccm",
-            "MIR",
+            "PROJ",
             "oslc_cm:type='defect'",
             select="dcterms:title,dcterms:identifier,dcterms:type,oslc_cm:status,dcterms:contributor",
         )

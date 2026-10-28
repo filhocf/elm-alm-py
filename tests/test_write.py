@@ -24,7 +24,7 @@ CCM_CATALOG_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
     xmlns:oslc="http://open-services.net/ns/core#"
     xmlns:dcterms="http://purl.org/dc/terms/">
     <oslc:ServiceProvider rdf:about="{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g">
-        <dcterms:title>MEU IMOVEL RURAL (MIR)</dcterms:title>
+        <dcterms:title>MY PROJECT (KEY)</dcterms:title>
     </oslc:ServiceProvider>
 </rdf:RDF>
 """
@@ -84,28 +84,12 @@ def _mock_ccm_discovery():
 
 
 @respx.mock
-async def test_find_creation_factory():
-    _mock_ccm_discovery()
-    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
-    url = await oslc._find_creation_factory("ccm", project_url)
-    assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"
-
-
-@respx.mock
-async def test_find_creation_factory_by_type():
-    _mock_ccm_discovery()
-    project_url = f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g"
-    url = await oslc._find_creation_factory("ccm", project_url, wi_type="task")
-    assert url == f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems"
-
-
-@respx.mock
 async def test_create_resource():
     _mock_ccm_discovery()
     respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "New Task"})
+    result = await oslc.create_resource("ccm", "MY PROJECT (KEY)", {"dcterms:title": "New Task"})
     assert result["dcterms:identifier"] == "42"
 
 
@@ -126,7 +110,7 @@ async def test_create_workitem_tool():
     respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="New Task", type="task")
+    result = await create_workitem(project="MY PROJECT (KEY)", title="New Task", type="task")
     assert result["dcterms:identifier"] == "42"
 
 
@@ -136,7 +120,7 @@ async def test_create_workitem_with_parent():
     respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Child Task", type="task", parent_id="10")
+    result = await create_workitem(project="MY PROJECT (KEY)", title="Child Task", type="task", parent_id="10")
     assert result["dcterms:identifier"] == "42"
 
 
@@ -157,13 +141,19 @@ async def test_add_child_workitem_tool():
     respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await add_child_workitem(parent_id="10", title="Sub-task")
+    result = await add_child_workitem(parent_id="10", title="Sub-task", project="MY PROJECT (KEY)")
     assert result["dcterms:identifier"] == "42"
+
+
+async def test_add_child_workitem_requires_project():
+    """project é obrigatório (sem default de tenant): chamar sem ele é TypeError."""
+    with pytest.raises(TypeError):
+        await add_child_workitem(parent_id="10", title="Sub-task")
 
 
 async def test_create_workitem_invalid_type():
     with pytest.raises(ToolError, match="Invalid type"):
-        await create_workitem(project="MIR", title="X", type="epic")
+        await create_workitem(project="PROJ", title="X", type="epic")
 
 
 async def test_update_workitem_no_fields():
@@ -178,7 +168,7 @@ async def test_create_resource_post_400():
         return_value=httpx.Response(400, text="Bad Request")
     )
     with pytest.raises(httpx.HTTPStatusError):
-        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+        await oslc.create_resource("ccm", "MY PROJECT (KEY)", {"dcterms:title": "X"})
 
 
 @respx.mock
@@ -188,7 +178,7 @@ async def test_create_resource_post_401():
         return_value=httpx.Response(401, text="Unauthorized")
     )
     with pytest.raises(httpx.HTTPStatusError):
-        await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+        await oslc.create_resource("ccm", "MY PROJECT (KEY)", {"dcterms:title": "X"})
 
 
 @respx.mock
@@ -227,7 +217,7 @@ async def test_create_resource_posts_to_workitems_url():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/_MWxBEJB7Ee-fe_bes9r78g/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await oslc.create_resource("ccm", "MEU IMOVEL RURAL (MIR)", {"dcterms:title": "X"})
+    result = await oslc.create_resource("ccm", "MY PROJECT (KEY)", {"dcterms:title": "X"})
     assert post_route.called
     assert result["dcterms:identifier"] == "42"
 
@@ -346,7 +336,7 @@ async def test_create_workitem_with_custom_fields():
         return_value=httpx.Response(201, json=CREATED_WI)
     )
     result = await create_workitem(
-        project="MEU IMOVEL RURAL (MIR)",
+        project="MY PROJECT (KEY)",
         title="Test Task",
         type="task",
         custom_fields={"rtc_ext:com.company.team.workitem.attribute.categoriatarefa": "literal.l10"},
@@ -367,7 +357,7 @@ async def test_create_workitem_without_custom_fields():
         return_value=httpx.Response(201, json=CREATED_WI)
     )
     result = await create_workitem(
-        project="MEU IMOVEL RURAL (MIR)",
+        project="MY PROJECT (KEY)",
         title="Test Task",
         type="task",
     )
@@ -395,7 +385,7 @@ async def test_golden_creation_url_is_workitems_not_defect():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    result = await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    result = await create_workitem(project="MY PROJECT (KEY)", title="Test", type="task")
     assert result["dcterms:identifier"] == "42"
     assert post_route.called
 
@@ -408,7 +398,7 @@ async def test_golden_content_type_is_rdf_xml():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    await create_workitem(project="MY PROJECT (KEY)", title="Test", type="task")
     assert post_route.calls[0].request.headers["content-type"] == "application/rdf+xml"
 
 
@@ -438,7 +428,7 @@ async def test_golden_category_uses_itemoid_format():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    await create_workitem(project="MY PROJECT (KEY)", title="Test", type="task")
     body = post_route.calls[0].request.content.decode()
     assert f"resource/itemOid/com.ibm.team.workitem.Category/{CATEGORY_OID}" in body
 
@@ -452,7 +442,7 @@ async def test_golden_custom_fields_as_rdf_resource():
         return_value=httpx.Response(201, json=CREATED_WI)
     )
     await create_workitem(
-        project="MEU IMOVEL RURAL (MIR)",
+        project="MY PROJECT (KEY)",
         title="Test",
         type="task",
         custom_fields={
@@ -475,7 +465,7 @@ async def test_golden_type_id_is_task_not_requirementchangerequest():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    await create_workitem(project="MY PROJECT (KEY)", title="Test", type="task")
     body = post_route.calls[0].request.content.decode()
     assert f"/types/{PROJECT_AREA_ID}/task" in body
 
@@ -503,7 +493,7 @@ async def test_golden_plannedfor_iteration_format():
     post_route = respx.post(f"{BASE}/ccm/oslc/contexts/{PROJECT_AREA_ID}/workitems").mock(
         return_value=httpx.Response(201, json=CREATED_WI)
     )
-    await create_workitem(project="MEU IMOVEL RURAL (MIR)", title="Test", type="task")
+    await create_workitem(project="MY PROJECT (KEY)", title="Test", type="task")
     body = post_route.calls[0].request.content.decode()
     assert f"/oslc/iterations/{ITERATION_OID}" in body
 
@@ -517,15 +507,15 @@ async def test_update_workitem_owner():
     _mock_auth()
     uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
     respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
-    updated = {**CREATED_WI, "dcterms:contributor": {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}}
+    updated = {**CREATED_WI, "dcterms:contributor": {"rdf:resource": f"{BASE}/jts/users/jdoe"}}
     put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=updated))
-    result = await update_workitem(id="42", owner="claudio.filho")
-    assert result["dcterms:contributor"]["rdf:resource"] == f"{BASE}/jts/users/claudio.filho"
+    result = await update_workitem(id="42", owner="jdoe")
+    assert result["dcterms:contributor"]["rdf:resource"] == f"{BASE}/jts/users/jdoe"
     body = put_route.calls[0].request.content
     import json as _json
 
     sent = _json.loads(body)
-    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/jdoe"}
 
 
 @respx.mock
@@ -578,13 +568,13 @@ async def test_update_workitem_multiple_fields():
     uri = f"{BASE}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/42"
     respx.get(uri).mock(return_value=httpx.Response(200, json=CREATED_WI, headers={"ETag": '"e1"'}))
     put_route = respx.put(uri).mock(return_value=httpx.Response(200, json=CREATED_WI))
-    await update_workitem(id="42", title="New Title", owner="claudio.filho", estimate_hours=16)
+    await update_workitem(id="42", title="New Title", owner="jdoe", estimate_hours=16)
     body = put_route.calls[0].request.content
     import json as _json
 
     sent = _json.loads(body)
     assert sent["dcterms:title"] == "New Title"
-    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/claudio.filho"}
+    assert sent["dcterms:contributor"] == {"rdf:resource": f"{BASE}/jts/users/jdoe"}
     assert sent["rtc_cm:estimate"] == 57600000
 
 
@@ -623,7 +613,7 @@ async def test_list_iterations():
     respx.get(f"{BASE}/ccm/oslc/iterations/_iter1").mock(return_value=httpx.Response(200, json=ITER1_JSON))
     respx.get(f"{BASE}/ccm/oslc/iterations/_iter2").mock(return_value=httpx.Response(200, json=ITER2_JSON))
     respx.get(f"{BASE}/ccm/oslc/iterations/_iter3").mock(return_value=httpx.Response(200, json=ITER3_JSON))
-    result = await list_iterations(project="MEU IMOVEL RURAL (MIR)")
+    result = await list_iterations(project="MY PROJECT (KEY)")
     assert len(result) == 3
     assert result[1]["title"] == "Sprint 1"
     assert result[1]["start_date"] == "2026-05-01"

@@ -1,6 +1,6 @@
 # SPEC — Dead code cleanup
 
-**Status:** PLANNED (G0) · **Release:** v0.5.0 · **RFC-mãe:** RFC-001 §5
+**Status:** DONE (G5) · **Release:** v0.4.0 · **RFC-mãe:** RFC-001 §5
 **Pesquisa:** diagnóstico codebase-memory (415 nós) · **Classe:** higiene de engenharia
 
 ## Meta
