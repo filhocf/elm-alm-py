@@ -12,7 +12,7 @@ processo viajar com o repositório — não depender do harness local do dono.
 
 - [ ] **`.codebase-memory/graph.db.zst` versionado** — commitar o grafo (já gerado com `persistence:true`);
   tirar do .gitignore se estiver. Quem clona navega sem reindexar.
-- [ ] **`tests-prove-fix`** — job de CI que roda os testes alterados da PR contra a base e exige que
+- [x] **`tests-prove-fix`** — job de CI que roda os testes alterados da PR contra a base e exige que
   falhem sem a mudança (gate RED automatizado). Lógica em `scripts/ci/`, testada.
 - [ ] **Changelog atômico** — `changelog.d/<n>.<cat>.md` por PR que toca `src/`; `changelog.yml` valida.
 - [ ] **SHA-pin** nas actions do CI (`actions/checkout@<sha>`, não `@v4` móvel).
