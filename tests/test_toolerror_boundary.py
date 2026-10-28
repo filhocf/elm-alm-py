@@ -17,9 +17,9 @@ import httpx
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from elm_alm_py import server
-from elm_alm_py.auth import close_client
-from elm_alm_py.server import (
+from elm_mcp import server
+from elm_mcp.auth import close_client
+from elm_mcp.server import (
     list_projects,
     list_workitems,
     search_requirements,
@@ -31,7 +31,7 @@ BASE = "https://elm.example.com"
 
 @pytest.fixture(autouse=True)
 async def _cfg(monkeypatch):
-    monkeypatch.setattr("elm_alm_py.config.settings.elm_url", BASE)
+    monkeypatch.setattr("elm_mcp.config.settings.elm_url", BASE)
     yield
     await close_client()
 
@@ -46,7 +46,7 @@ async def test_list_projects_translates_oslc_valueerror_to_toolerror():
     msg = "Cannot find service provider catalog for domain 'ccm'"
     with (
         patch(
-            "elm_alm_py.server.oslc.list_service_providers",
+            "elm_mcp.server.oslc.list_service_providers",
             new=AsyncMock(side_effect=ValueError(msg)),
         ),
         pytest.raises(ToolError, match="Cannot find service provider catalog"),
@@ -59,7 +59,7 @@ async def test_search_requirements_translates_project_not_found():
     msg = "Project 'Nope' not found. Available: ['MIR']"
     with (
         patch(
-            "elm_alm_py.server.oslc.query_resources",
+            "elm_mcp.server.oslc.query_resources",
             new=AsyncMock(side_effect=ValueError(msg)),
         ),
         pytest.raises(ToolError, match="Project 'Nope' not found"),
@@ -71,7 +71,7 @@ async def test_list_workitems_translates_runtimeerror():
     """RuntimeError from the OSLC layer is also translated (not only ValueError)."""
     with (
         patch(
-            "elm_alm_py.server.oslc.query_resources",
+            "elm_mcp.server.oslc.query_resources",
             new=AsyncMock(side_effect=RuntimeError("Expected 201 Created, got 500")),
         ),
         pytest.raises(ToolError, match="Expected 201 Created"),
@@ -102,7 +102,7 @@ async def test_transition_workitem_missing_etag_raises_toolerror():
     fake_client.get = AsyncMock(return_value=get_resp)
 
     with (
-        patch("elm_alm_py.server.oslc.get_client", new=AsyncMock(return_value=fake_client)),
+        patch("elm_mcp.server.oslc.get_client", new=AsyncMock(return_value=fake_client)),
         pytest.raises(ToolError, match="did not return an ETag"),
     ):
         await transition_workitem(id="12345", action="start")

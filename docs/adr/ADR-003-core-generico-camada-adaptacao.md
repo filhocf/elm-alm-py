@@ -4,7 +4,7 @@
 
 ## Contexto
 
-O elm-alm-py precisa servir qualquer servidor IBM ELM, mas a implementação cresceu com acoplamento a
+O elm-mcp precisa servir qualquer servidor IBM ELM, mas a implementação cresceu com acoplamento a
 um tenant concreto: default `project="MEU IMOVEL RURAL (MIR)"` em `add_child_workitem`, exemplos com
 host e namespaces de um cliente específico no README/USAGE, lógica de campos customizados nos scripts
 externos (jandaia). As propriedades de work item (filedAgainst, teamArea, plannedFor, campos custom,
@@ -14,7 +14,7 @@ tipos custom, estados de workflow) **variam por servidor e por PA**.
 
 Separar em duas camadas:
 
-- **Core (`elm_alm_py`)** — genérico IBM ELM/OSLC. Namespaces IBM/Jazz (oslc, oslc_cm, oslc_rm,
+- **Core (`elm_mcp`)** — genérico IBM ELM/OSLC. Namespaces IBM/Jazz (oslc, oslc_cm, oslc_rm,
   rtc_cm, rtc_ext, jazz_rm, nav, calm, dcterms, process). Discovery dinâmico. CRUD RM/CCM/QM. Workflow
   genérico. **Zero strings de tenant** (nenhum nome de empresa/PA/host fixo).
 - **Camada de adaptação (perfil por PA)** — host do servidor, nome da PA, filedAgainst/teamArea/

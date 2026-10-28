@@ -5,7 +5,7 @@
 
 ## Meta
 
-O pacote `elm_alm_py` não cita nenhum cliente/empresa/PA/host concreto. Valores de tenant vivem só em
+O pacote `elm_mcp` não cita nenhum cliente/empresa/PA/host concreto. Valores de tenant vivem só em
 configuração/perfil, nunca no código ou na doc pública.
 
 ## Escopo (confirmado por grep)

@@ -23,4 +23,4 @@ Dependências do core: só `mcp`, `httpx`, `pydantic`.
   independente — não é fork do software da IBM".
 
 ## Fontes
-- **F3**: `git log --reverse` do elm-alm-py (Initial commit 18/mai); `pyproject.toml` (deps = mcp/httpx/pydantic, sem elmclient).
+- **F3**: `git log --reverse` do projeto, hoje elm-mcp (Initial commit 18/mai); `pyproject.toml` (deps = mcp/httpx/pydantic, sem elmclient).

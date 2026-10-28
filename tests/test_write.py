@@ -5,9 +5,9 @@ import pytest
 import respx
 from mcp.server.mcpserver.exceptions import ToolError
 
-from elm_alm_py import oslc
-from elm_alm_py.auth import close_client
-from elm_alm_py.server import add_child_workitem, create_workitem, update_workitem
+from elm_mcp import oslc
+from elm_mcp.auth import close_client
+from elm_mcp.server import add_child_workitem, create_workitem, update_workitem
 
 BASE = "https://elm.example.com"
 
@@ -55,7 +55,7 @@ CREATED_WI = {
 
 @pytest.fixture(autouse=True)
 async def cleanup(monkeypatch):
-    monkeypatch.setattr("elm_alm_py.config.settings.elm_url", BASE)
+    monkeypatch.setattr("elm_mcp.config.settings.elm_url", BASE)
     yield
     await close_client()
 
@@ -616,7 +616,7 @@ ITER3_JSON = {
 @respx.mock
 async def test_list_iterations():
     """list_iterations must return iterations with title, dates, and URI."""
-    from elm_alm_py.server import list_iterations
+    from elm_mcp.server import list_iterations
 
     _mock_ccm_discovery()
     respx.get(f"{BASE}/ccm/oslc/iterations").mock(return_value=httpx.Response(200, json=ITERATIONS_LIST_JSON))

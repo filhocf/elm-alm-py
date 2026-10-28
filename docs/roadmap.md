@@ -1,6 +1,6 @@
-# elm-alm-py — Roadmap
+# elm-mcp — Roadmap
 
-> O PLANO. Backlog de releases do elm-alm-py (MCP server para IBM ELM via OSLC).
+> O PLANO. Backlog de releases do elm-mcp (MCP server para IBM ELM via OSLC).
 > Cadeia de rastreabilidade: **Roadmap (este doc) → RFC (`docs/rfc/`) → SPECs atômicas
 > (`docs/specs/`) → PRs**. Decisões transversais em `docs/adr/`. Pesquisa de fundamento em
 > `conhecimentos-de-ia/ferramentas/elm-mcp/`.
@@ -8,7 +8,7 @@
 
 ## Visão
 
-Elevar o elm-alm-py de "cliente OSLC read + CRUD de work item" para o **middleware** entre o
+Elevar o elm-mcp de "cliente OSLC read + CRUD de work item" para o **middleware** entre o
 processo agêntico (DAIA) e o ALM tradicional (IBM ELM), como projeto open-source de primeira linha
 (tenant-neutro, instalável em um comando, gate agêntico no repo). Detalhe: `docs/rfc/RFC-001`.
 

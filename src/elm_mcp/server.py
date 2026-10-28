@@ -13,7 +13,7 @@ from .config import settings
 
 logger = logging.getLogger(__name__)
 
-mcp = MCPServer("elm-alm-py", instructions="IBM ELM (DOORS Next, RTC, ETM) via OSLC")
+mcp = MCPServer("elm-mcp", instructions="IBM ELM (DOORS Next, RTC, ETM) via OSLC")
 
 VALID_DOMAINS = ("rm", "ccm", "qm")
 

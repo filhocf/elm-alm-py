@@ -9,16 +9,17 @@
 
 ## 1. Problema
 
-O elm-alm-py nasceu (mai/2026) como cliente OSLC read-only e cresceu organicamente até CRUD de work
-item CCM, sem roadmap, sem docs estruturados, com acoplamento a um tenant específico e sem o gate
-agêntico que nossos projetos maduros (orc, mms) têm. Ao mesmo tempo, o DAIA precisa dele como a
+O projeto (publicado como `elm-mcp`; chamado `elm-alm-py` entre mai e out/2026) nasceu como cliente
+OSLC read-only e cresceu organicamente até CRUD de work item CCM, sem roadmap, sem docs estruturados,
+com acoplamento a um tenant específico e sem o gate agêntico que nossos projetos maduros (orc, mms)
+têm. Ao mesmo tempo, o DAIA precisa dele como a
 **membrana** entre o fluxo agêntico (gera specs, requisitos, testes) e o ALM corporativo (IBM ELM) —
 e hoje ele cobre só parte desse papel. Há um gap de **produto** (o que o MCP sabe fazer) e de
 **engenharia** (como o projeto é mantido).
 
 ## 2. Proposta
 
-Evoluir o elm-alm-py em duas frentes, por releases rastreáveis (`docs/roadmap.md`):
+Evoluir o elm-mcp em duas frentes, por releases rastreáveis (`docs/roadmap.md`):
 
 - **Produto:** fechar as capacidades que faltam para ser a membrana completa — escrita de requisito
   (RM), discovery dinâmico por PA, links de rastreabilidade, escrita de teste (QM), relatórios.
@@ -29,7 +30,7 @@ Evoluir o elm-alm-py em duas frentes, por releases rastreáveis (`docs/roadmap.m
 
 - **Não é fork.** Implementação própria sobre o protocolo **OSLC REST** (OASIS). Não usa a lib
   `elmclient` da IBM. Decisão: `docs/adr/ADR-001`.
-- **Tenant-neutro.** O core (`elm_alm_py`) não cita nenhum cliente/empresa. Valores concretos de
+- **Tenant-neutro.** O core (`elm_mcp`) não cita nenhum cliente/empresa. Valores concretos de
   servidor/PA/campos vivem numa **camada de adaptação** (perfil por project area), descoberta via
   discovery OSLC. Decisão: `docs/adr/ADR-003`.
 - **mcp 2.x.** Server sobre `MCPServer` (não FastMCP). Decisão: `docs/adr/ADR-002`.
@@ -65,14 +66,18 @@ Data Warehouse (fallback). **Nunca** o DB transacional (IBM desaconselha). O "RS
 usa = relatórios montados no **Report Builder** → expor via REST, não tocar o banco. Detalhe:
 `pesquisa-apis-elm.md §5` e `SPEC-reportbuilder-rs`.
 
-## 7. Decisões em aberto
+## 7. Decisões
 
-- Nome final no PyPI (`elm-alm-py` atual, por disponibilidade) vs `elm-mcp`. → ADR futuro quando decidir.
-- `/fix` agêntico com push automático (padrão fakeflix) vs commit que exige re-review. → `SPEC-repo-gold-ci`.
+- **Nome:** migrado para `elm-mcp` (28/out) — distribuição PyPI, módulo `elm_mcp`, entry point `elm-mcp`
+  e repositório `github.com/filhocf/elm-mcp`. Ambos os nomes (PyPI e GitHub) já eram do próprio autor
+  (primeira versão de mai/2026); o repo antigo foi removido e o atual renomeado, com redirect do nome
+  anterior. Registrar em ADR-004.
+- **`/fix` agêntico:** DECIDIDO (28/out) — somente `/review` (read-only, comenta); a correção volta para
+  o dev resolver localmente e re-submeter. Sem agente escrevendo no repo. Ver `SPEC-repo-gold-ci`.
 
 ## Fontes
 
 - **F3**: `conhecimentos-de-ia/ferramentas/elm-mcp/levantamento-interno-alm.md` (ações jandaia/daia/PD,
   matriz de cobertura vs 12 tools) e `pesquisa-apis-elm.md` (capacidades OSLC/Reportable REST/reporting),
   ambos 27-29/out/2026.
-- **F3**: diagnóstico codebase-memory do elm-alm-py (415 nós; `_find_creation_factory` sem chamador de produção).
+- **F3**: diagnóstico codebase-memory do elm-mcp (415 nós; `_find_creation_factory` sem chamador de produção).

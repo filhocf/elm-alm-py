@@ -33,8 +33,8 @@ import pytest
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from elm_alm_py import server
-from elm_alm_py.server import (
+from elm_mcp import server
+from elm_mcp.server import (
     create_workitem,
     list_projects,
     transition_workitem,

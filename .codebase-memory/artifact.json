@@ -1,12 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "ebb06c5d1dded353be714e8b93500b6bb7979b3e",
-    "indexed_at": "2026-10-28T09:36:28Z",
-    "project": "home-claudio-git-elm-alm-py",
-    "nodes": 415,
-    "edges": 1350,
-    "original_size": 3735552,
-    "compressed_size": 434048,
-    "compression_level": 9,
-    "reconcile_basis": "git-clean-head"
+    "commit": "a6e89a514bf2527267849d803c0d78c286ac57f9",
+    "indexed_at": "2026-10-28T12:51:23Z",
+    "project": "home-claudio-git-elm-mcp",
+    "nodes": 572,
+    "edges": 1539,
+    "original_size": 3801088,
+    "compressed_size": 477094,
+    "compression_level": 9
 }
