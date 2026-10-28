@@ -1,7 +1,9 @@
 """OSLC service discovery and query builder for IBM ELM."""
 
 import logging
+import re as _re
 from xml.etree import ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 
 import httpx
 
@@ -393,9 +395,6 @@ async def update_resource(uri: str, payload: dict) -> dict:
 # avoid regression on the single write gargalo of CCM. Uses regex (not ET)
 # for RM discovery — ET fails in the MCP stdio context (memória 0c1b2aa4).
 # =====================================================================
-
-import re as _re  # local alias for the RM regex path, kept out of CCM code
-from xml.sax.saxutils import escape as _xml_escape
 
 # RM-specific namespaces (jazz_rm:primaryText, nav:parent). Additive to NS.
 NS["jazz_rm"] = "http://jazz.net/ns/rm#"
