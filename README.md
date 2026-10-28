@@ -80,6 +80,10 @@ export ELM_PASSWORD=secret
 **Read:** `list_projects` · `search_requirements` · `get_requirement` · `list_workitems` ·
 `get_workitem` · `search_testcases` · `list_iterations` · `get_plan_items`
 
+**Discovery:** `list_types` · `list_fields` · `inspect_workitem` · `list_folders`
+
+**Write (RM requirements):** `create_requirement` · `update_requirement`
+
 **Write (CCM work items):** `create_workitem` · `update_workitem` · `add_child_workitem` ·
 `transition_workitem`
 
@@ -87,7 +91,11 @@ Full reference with signatures: [docs/TOOLS.md](docs/TOOLS.md). Query syntax and
 [docs/USAGE.md](docs/USAGE.md).
 
 ```python
-# Example: create a task and move it to "start"
+# Discover the shape and required fields before writing — nothing is hardcoded per project
+list_types(domain="ccm", project="MY PROJECT (KEY)")
+list_fields(domain="ccm", project="MY PROJECT (KEY)", type="Task")
+
+# Create a task and move it to "start"
 create_workitem(project="MY PROJECT (KEY)", title="Wire up OSLC discovery", type="task")
 transition_workitem(id="12345", action="start")
 ```
