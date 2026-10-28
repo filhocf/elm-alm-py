@@ -463,14 +463,31 @@ async def _find_requirement_factory(project_url: str) -> str:
     xml_text = resp.text
 
     # Match each CreationFactory block, then pick the one whose resourceType is
-    # rm#Requirement and extract its oslc:creation resource.
+    # EXACTLY rm#Requirement — not a substring match, which would also accept
+    # rm#RequirementCollection (DOORS Next exposes both). Mistake note ed14f77c.
     for block in _re.findall(r"<\w*:?CreationFactory\b.*?</\w*:?CreationFactory>", xml_text, _re.DOTALL):
-        if _RM_REQUIREMENT_TYPE not in block:
+        rt = _re.search(r"<\w*:?resourceType\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        if rt is None or rt.group(1) != _RM_REQUIREMENT_TYPE:
             continue
         m = _re.search(r"<\w*:?creation\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
         if m:
             return m.group(1)
     raise ValueError(f"RM CreationFactory for Requirement not found in '{project_url}'")
+
+
+def _assert_xhtml_wellformed(xhtml: str) -> None:
+    """Reject XHTML content that is not well-formed, to prevent it from breaking
+    out of the jazz_rm:primaryText literal (XML injection). The content goes in
+    non-escaped (parseType="Literal"), so a stray </jazz_rm:primaryText> or
+    unbalanced tag could inject sibling structure. Parse it in isolation first.
+    """
+    if not xhtml:
+        return
+    fragment = f'<div xmlns="http://www.w3.org/1999/xhtml">{xhtml}</div>'
+    try:
+        ET.fromstring(fragment)
+    except ET.ParseError as exc:
+        raise ValueError(f"requirement content is not well-formed XHTML: {exc}") from exc
 
 
 def _requirement_to_rdfxml(title: str, xhtml: str, shape: str | None = None, folder: str | None = None) -> str:
@@ -479,6 +496,8 @@ def _requirement_to_rdfxml(title: str, xhtml: str, shape: str | None = None, fol
     The XHTML is embedded NON-escaped inside jazz_rm:primaryText with
     rdf:parseType="Literal" (different from the CCM _payload_to_rdfxml, which
     escapes everything). Title is escaped (it is plain text, not markup).
+    The XHTML must be well-formed (checked by the caller) so it cannot break out
+    of the literal.
     """
     shape_tag = f'    <oslc:instanceShape rdf:resource="{shape}"/>\n' if shape else ""
     folder_tag = f'    <nav:parent rdf:resource="{folder}"/>\n' if folder else ""
@@ -525,6 +544,7 @@ async def create_requirement(
     """
     project_url = await _resolve_project_url("rm", project)
     factory_url = await _find_requirement_factory(project_url)
+    _assert_xhtml_wellformed(xhtml)
     rdf_body = _requirement_to_rdfxml(title, xhtml, shape=shape, folder=folder)
     client = await get_client()
     post_headers = {
@@ -563,12 +583,31 @@ async def update_requirement(uri: str, title: str | None = None, xhtml: str | No
     if not etag:
         raise ValueError(f"Server did not return an ETag for resource '{uri}'. Cannot safely update.")
     xml_content = get_resp.text
+    if xhtml is not None:
+        _assert_xhtml_wellformed(sanitize_html_to_xhtml(xhtml))
+
+    # Edit ONLY inside the target resource's <rdf:Description> block, not the
+    # first/any match in the whole document (a GET may return several Descriptions
+    # — linked resources, folders). Anchor on rdf:about matching the uri; fall
+    # back to the first Description if the server omits/abbreviates rdf:about.
+    desc_re = _re.compile(
+        r'(<\w*:?Description\b[^>]*rdf:about="' + _re.escape(uri) + r'"[^>]*>)(.*?)(</\w*:?Description>)',
+        _re.DOTALL,
+    )
+    m = desc_re.search(xml_content)
+    if m is None:
+        desc_re = _re.compile(r"(<\w*:?Description\b[^>]*>)(.*?)(</\w*:?Description>)", _re.DOTALL)
+        m = desc_re.search(xml_content)
+    if m is None:
+        raise ValueError(f"could not locate the requirement's rdf:Description in '{uri}'")
+
+    open_tag, body, close_tag = m.group(1), m.group(2), m.group(3)
 
     if title is not None:
-        xml_content = _re.sub(
+        body = _re.sub(
             r"(<\w*:?title[^>]*>)(.*?)(</\w*:?title>)",
-            lambda m: m.group(1) + _xml_escape(title) + m.group(3),
-            xml_content,
+            lambda t: t.group(1) + _xml_escape(title) + t.group(3),
+            body,
             count=1,
             flags=_re.DOTALL,
         )
@@ -576,16 +615,19 @@ async def update_requirement(uri: str, title: str | None = None, xhtml: str | No
     if xhtml is not None:
         clean = sanitize_html_to_xhtml(xhtml)
         primary_content = f'<div xmlns="http://www.w3.org/1999/xhtml">{clean}</div>'
-        if "jazz_rm:primaryText" in xml_content:
-            xml_content = _re.sub(
+        if "jazz_rm:primaryText" in body:
+            body = _re.sub(
                 r"(<jazz_rm:primaryText[^>]*>)(.*?)(</jazz_rm:primaryText>)",
-                lambda m: m.group(1) + primary_content + m.group(3),
-                xml_content,
+                lambda t: t.group(1) + primary_content + t.group(3),
+                body,
+                count=1,
                 flags=_re.DOTALL,
             )
         else:
             primary_tag = f'<jazz_rm:primaryText rdf:parseType="Literal">{primary_content}</jazz_rm:primaryText>'
-            xml_content = xml_content.replace("</rdf:Description>", f"    {primary_tag}\n  </rdf:Description>")
+            body = body + f"    {primary_tag}\n  "
+
+    xml_content = xml_content[: m.start()] + open_tag + body + close_tag + xml_content[m.end() :]
 
     put_resp = await client.put(
         uri,

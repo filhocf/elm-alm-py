@@ -269,3 +269,105 @@ async def test_create_requirement_unknown_project_raises_tool_error():
             title="X",
             content="<p>x</p>",
         )
+
+
+# =====================================================================
+# G5 regression tests (4 P1 found by Tuvok) — these would FAIL without
+# the fixes: exact resourceType match, XML well-formedness, and anchored
+# update edits.
+# =====================================================================
+
+# Service doc where a RequirementCollection factory comes BEFORE the Requirement
+# one. A substring match on "rm#Requirement" would wrongly pick the collection.
+RM_SERVICES_DECOY_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:oslc="http://open-services.net/ns/core#">
+    <oslc:Service>
+        <oslc:creationFactory>
+            <oslc:CreationFactory>
+                <dcterms:title>Requirement Collection</dcterms:title>
+                <oslc:resourceType rdf:resource="http://open-services.net/ns/rm#RequirementCollection"/>
+                <oslc:creation rdf:resource="{BASE}/rm/oslc_rm/_rmproj/collectionFactory"/>
+            </oslc:CreationFactory>
+        </oslc:creationFactory>
+        <oslc:creationFactory>
+            <oslc:CreationFactory>
+                <dcterms:title>Requirement</dcterms:title>
+                <oslc:resourceType rdf:resource="http://open-services.net/ns/rm#Requirement"/>
+                <oslc:creation rdf:resource="{RM_FACTORY_URL}"/>
+            </oslc:CreationFactory>
+        </oslc:creationFactory>
+    </oslc:Service>
+</rdf:RDF>
+"""
+
+
+@respx.mock
+async def test_factory_discovery_skips_requirement_collection():
+    """P1: must pick the Requirement factory, not RequirementCollection (which
+    contains 'rm#Requirement' as a substring)."""
+    _mock_auth()
+    respx.get(f"{BASE}/rm/rootservices").mock(return_value=httpx.Response(200, text=RM_ROOTSERVICES_XML))
+    respx.get(f"{BASE}/rm/oslc_rm/catalog").mock(return_value=httpx.Response(200, text=RM_CATALOG_XML))
+    respx.get(f"{BASE}/rm/oslc_rm/_rmproj/services.xml").mock(
+        return_value=httpx.Response(200, text=RM_SERVICES_DECOY_XML)
+    )
+    factory = await oslc._find_requirement_factory(f"{BASE}/rm/oslc_rm/_rmproj/services.xml")
+    assert factory == RM_FACTORY_URL
+    assert "collectionFactory" not in factory
+
+
+@respx.mock
+async def test_create_requirement_rejects_malformed_content():
+    """P1: content that breaks out of primaryText (unbalanced tag) is rejected
+    before the POST, not sent as malformed XML."""
+    _mock_rm_discovery()
+    posted = respx.post(RM_FACTORY_URL).mock(return_value=httpx.Response(201, headers={"Location": CREATED_RM_URI}))
+    with pytest.raises(ToolError):
+        await create_requirement(
+            project="MY RM PROJECT",
+            title="Injection",
+            content="ok</div></jazz_rm:primaryText><evil/>",
+        )
+    assert not posted.called  # nothing was POSTed with a malformed body
+
+
+# XML with TWO rdf:Description and TWO titles — the target is the second one.
+_OTHER_URI = f"{BASE}/rm/resources/_other"
+RM_MULTI_DESC_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    xmlns:jazz_rm="http://jazz.net/ns/rm#">
+  <rdf:Description rdf:about="{_OTHER_URI}">
+    <dcterms:title>OTHER — do not touch</dcterms:title>
+  </rdf:Description>
+  <rdf:Description rdf:about="{CREATED_RM_URI}">
+    <dcterms:title>Old title</dcterms:title>
+  </rdf:Description>
+</rdf:RDF>
+"""
+
+
+@respx.mock
+async def test_update_requirement_edits_only_target_description():
+    """P1: the title edit must hit the target resource's Description, not the
+    first <title> in the document (a linked resource)."""
+    _mock_auth()
+    captured = {}
+
+    def _capture(request):
+        captured["body"] = request.content.decode("utf-8")
+        return httpx.Response(200)
+
+    respx.get(CREATED_RM_URI).mock(
+        return_value=httpx.Response(200, text=RM_MULTI_DESC_XML, headers={"ETag": "etag-xyz"})
+    )
+    respx.put(CREATED_RM_URI).mock(side_effect=_capture)
+
+    await update_requirement(uri=CREATED_RM_URI, title="New title")
+
+    body = captured["body"]
+    assert "New title" in body
+    assert "OTHER — do not touch" in body  # the other resource's title is intact
+    assert "Old title" not in body  # the target's title was replaced
