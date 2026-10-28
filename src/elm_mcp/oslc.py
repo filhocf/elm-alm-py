@@ -644,3 +644,262 @@ async def update_requirement(uri: str, title: str | None = None, xhtml: str | No
         put_resp.raise_for_status()
         raise RuntimeError(f"Expected 200/204, got {put_resp.status_code}")
     return {"uri": uri, "identifier": _extract_identifier(put_resp.text)}
+
+
+# =====================================================================
+# Discovery tools — shapes / fields / folders / work item inspection.
+# ADDITIVE, read-only (G0-discovery-tools.md). Regex parsing (not ET —
+# ET fails in the MCP stdio context, memória 0c1b2aa4); JSON is parsed
+# natively where the entry point returns JSON (folders, inspect_workitem).
+# =====================================================================
+
+# Config-management + RM public namespaces. Additive to NS (like jazz_rm/nav).
+NS["oslc_config"] = "http://open-services.net/ns/config#"
+NS["public_rm"] = "http://jazz.net/xmlns/rm/public/1.0/"
+
+# System folders filtered out of list_folders — tenant-neutral (no org string).
+_SYSTEM_FOLDER_TITLES = {"root", "Folder Query Results"}
+
+
+def _shape_title(xml_text: str) -> str | None:
+    """Read the type title from a resourceShape body.
+
+    Strips oslc:property blocks first so a property's dc:title cannot shadow the
+    type's dcterms:title — RDF/XML serialization order is not guaranteed by the
+    server, so the type title may appear after a property (G5 P2).
+    """
+    stripped = _re.sub(r"<\w*:?property\b.*?</\w*:?property>", "", xml_text, flags=_re.DOTALL)
+    m = _re.search(r"<\w*:?title[^>]*>([^<]+)</\w*:?title>", stripped)
+    return m.group(1).strip() if m else None
+
+
+async def _get_xml_text(url: str) -> str:
+    """GET a URL as rdf+xml/xml text (shared by the discovery helpers)."""
+    client = await get_client()
+    resp = await client.get(
+        url,
+        headers={"Accept": "application/rdf+xml, application/xml", "OSLC-Core-Version": "2.0"},
+    )
+    resp.raise_for_status()
+    return resp.text
+
+
+async def list_resource_shapes(domain: str, project: str) -> list[dict]:
+    """List the resource types (shapes) of a project area.
+
+    For each CreationFactory whose oslc:resourceType EXACTLY matches the domain
+    type (rm#Requirement / cm#ChangeRequest / qm#TestCase — never a substring,
+    mistake note ed14f77c), extract its oslc:resourceShape URIs and GET each one
+    to read its title. Returns [{"title", "shape_uri", "resource_type"}].
+    """
+    project_url = await _resolve_project_url(domain, project)
+    xml_text = await _get_xml_text(project_url)
+    resource_type = QUERY_RESOURCE_TYPE[domain]
+
+    shapes: list[dict] = []
+    for block in _re.findall(r"<\w*:?CreationFactory\b.*?</\w*:?CreationFactory>", xml_text, _re.DOTALL):
+        rt = _re.search(r"<\w*:?resourceType\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        if rt is None or rt.group(1) != resource_type:
+            continue
+        for sh in _re.findall(r"<\w*:?resourceShape\s+[^>]*rdf:resource=\"([^\"]+)\"", block):
+            shape_xml = await _get_xml_text(sh)
+            shapes.append(
+                {
+                    "title": _shape_title(shape_xml),
+                    "shape_uri": sh,
+                    "resource_type": resource_type,
+                }
+            )
+    return shapes
+
+
+def _occurs_required(occurs: str | None) -> bool:
+    """A property is required when occurs is Exactly-one or One-or-many."""
+    if not occurs:
+        return False
+    return ("Exactly-one" in occurs) or ("One-or-many" in occurs)
+
+
+async def list_shape_properties(shape_uri: str) -> list[dict]:
+    """GET a resourceShape and extract its properties.
+
+    For each oslc:Property block: name, title, required (from oslc:occurs),
+    property_uri (propertyDefinition), range_uri, allowed_values_uri.
+    Returns [{"name","title","required","property_uri","range_uri","allowed_values_uri"}].
+    """
+    xml_text = await _get_xml_text(shape_uri)
+    props: list[dict] = []
+    for block in _re.findall(r"<\w*:?Property\b.*?</\w*:?Property>", xml_text, _re.DOTALL):
+        name_m = _re.search(r"<\w*:?name[^>]*>([^<]+)</\w*:?name>", block)
+        title_m = _re.search(r"<\w*:?title[^>]*>([^<]+)</\w*:?title>", block)
+        occurs_m = _re.search(r"<\w*:?occurs\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        propdef_m = _re.search(r"<\w*:?propertyDefinition\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        range_m = _re.search(r"<\w*:?range\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        allowed_m = _re.search(r"<\w*:?allowedValues\s+[^>]*rdf:resource=\"([^\"]+)\"", block)
+        props.append(
+            {
+                "name": name_m.group(1).strip() if name_m else None,
+                "title": title_m.group(1).strip() if title_m else None,
+                "required": _occurs_required(occurs_m.group(1) if occurs_m else None),
+                "property_uri": propdef_m.group(1) if propdef_m else None,
+                "range_uri": range_m.group(1) if range_m else None,
+                "allowed_values_uri": allowed_m.group(1) if allowed_m else None,
+            }
+        )
+    return props
+
+
+async def list_allowed_values(allowed_values_uri: str) -> list[dict]:
+    """GET an oslc:allowedValues resource and extract its values.
+
+    Two formats: oslc:allowedValue rdf:resource (URI only), or
+    rdf:Description with rdf:about + dcterms:title (URI + label).
+    Returns [{"value_uri", "title"}] (title None when absent).
+    """
+    xml_text = await _get_xml_text(allowed_values_uri)
+    values: list[dict] = []
+    # Format 2 first: rdf:Description blocks carry a title.
+    for block in _re.findall(r"<\w*:?Description\b[^>]*>.*?</\w*:?Description>", xml_text, _re.DOTALL):
+        about_m = _re.search(r"rdf:about=\"([^\"]+)\"", block)
+        title_m = _re.search(r"<\w*:?title[^>]*>([^<]+)</\w*:?title>", block)
+        if about_m:
+            values.append(
+                {
+                    "value_uri": about_m.group(1),
+                    "title": title_m.group(1).strip() if title_m else None,
+                }
+            )
+    if values:
+        return values
+    # Format 1: oslc:allowedValue rdf:resource (URIs only).
+    for uri in _re.findall(r"<\w*:?allowedValue\s+[^>]*rdf:resource=\"([^\"]+)\"", xml_text):
+        values.append({"value_uri": uri, "title": None})
+    return values
+
+
+async def list_fields(domain: str, project: str, type: str) -> dict:
+    """List required/optional fields of a type, with allowedValues when enumerated.
+
+    Resolves the shape by its title (case-insensitive equality) among the shapes
+    of the project; an unknown title raises ValueError (ToolError at the boundary).
+    Returns {"type","shape_uri","required":[...],"optional":[...]}; each field
+    carries allowed_values (empty list when the field is not enumerated).
+    """
+    shapes = await list_resource_shapes(domain, project)
+    matched = next((s for s in shapes if (s["title"] or "").lower() == type.lower()), None)
+    if matched is None:
+        available = [s["title"] for s in shapes]
+        raise ValueError(f"Type '{type}' not found. Available: {available}")
+    shape_uri = matched["shape_uri"]
+    props = await list_shape_properties(shape_uri)
+
+    required: list[dict] = []
+    optional: list[dict] = []
+    for p in props:
+        allowed_values: list[dict] = []
+        if p["allowed_values_uri"]:
+            allowed_values = await list_allowed_values(p["allowed_values_uri"])
+        field = {
+            "name": p["name"],
+            "title": p["title"],
+            "property_uri": p["property_uri"],
+            "range_uri": p["range_uri"],
+            "allowed_values": allowed_values,
+        }
+        (required if p["required"] else optional).append(field)
+
+    return {"type": matched["title"], "shape_uri": shape_uri, "required": required, "optional": optional}
+
+
+def _derive_factory_uri(shape_uri: str) -> str | None:
+    """Derive the CCM work item factory URI from an instanceShape path.
+
+    /oslc/context[s]/<ctx>/shapes/workitems/<X> -> /oslc/context[s]/<ctx>/workitems/<X>
+    (drops the /shapes/ segment). Returns None if the path has no shapes/workitems.
+    """
+    m = _re.search(r"/shapes/workitems/(.+)$", shape_uri)
+    if m is None:
+        return None
+    shape_path = m.group(1)
+    rewritten = _re.sub(
+        r"(/oslc/(?:contexts|context)/[^/]+/)shapes/workitems/.*$",
+        rf"\1workitems/{shape_path}",
+        shape_uri,
+    )
+    return rewritten
+
+
+async def inspect_workitem(id: str) -> dict:
+    """Read a real work item (JSON) and derive its shape/factory and filled fields.
+
+    Builds the WI URI like server.get_workitem, GETs it as JSON, extracts
+    oslc:instanceShape, dcterms:type, and the filled rtc_cm:*/rtc_ext:*/process:*
+    fields, and derives the factory URI from the shape path. Degrades to
+    shape_uri/factory_uri None when there is no instanceShape (does not raise).
+    Returns {"id","type","shape_uri","factory_uri","fields":{...}}.
+    """
+    uri = f"{settings.elm_url}/ccm/resource/itemName/com.ibm.team.workitem.WorkItem/{id}"
+    try:
+        data = await get_resource(uri)
+    except httpx.HTTPStatusError as exc:
+        # Surface a legible domain error (e.g. 404) through the @tool boundary,
+        # which translates ValueError/RuntimeError into ToolError.
+        raise ValueError(f"work item '{id}' not found ({exc.response.status_code})") from exc
+
+    shape = data.get("oslc:instanceShape")
+    shape_uri = shape.get("rdf:resource") if isinstance(shape, dict) else None
+    factory_uri = _derive_factory_uri(shape_uri) if shape_uri else None
+
+    fields: dict = {}
+    for key, value in data.items():
+        if not key.startswith(("rtc_cm:", "rtc_ext:", "process:")):
+            continue
+        if isinstance(value, dict) and "rdf:resource" in value:
+            fields[key] = value["rdf:resource"]
+        elif isinstance(value, (str, int, float, bool)):
+            fields[key] = value
+
+    return {
+        "id": data.get("dcterms:identifier", id),
+        "type": data.get("dcterms:type"),
+        "shape_uri": shape_uri,
+        "factory_uri": factory_uri,
+        "fields": fields,
+    }
+
+
+async def list_folders(project: str) -> list[dict]:
+    """List RM (DOORS Next) folders for a project.
+
+    Resolves the RM service provider, reads it as rdf+xml to extract the
+    oslc_config:component URI, then GETs /rm/folders?oslc.where=public_rm:parent=
+    <component> as JSON and parses {folder_uri: {dcterms:title:[{value}]}}.
+    System folders (root, Folder Query Results) are filtered (tenant-neutral).
+    Degrades to [] when the service provider exposes no component.
+    Returns [{"title","uri"}].
+    """
+    project_url = await _resolve_project_url("rm", project)
+    sp_xml = await _get_xml_text(project_url)
+    comp_m = _re.search(r"<\w*:?component\s+[^>]*rdf:resource=\"([^\"]+)\"", sp_xml)
+    if comp_m is None:
+        return []
+    component_uri = comp_m.group(1)
+
+    client = await get_client()
+    folders_url = f"{settings.elm_url}/rm/folders"
+    resp = await client.get(
+        folders_url,
+        params={"oslc.where": f"public_rm:parent={component_uri}"},
+        headers={"Accept": "application/json", "OSLC-Core-Version": "2.0"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    folders: list[dict] = []
+    for folder_uri, props in data.items():
+        title_entries = props.get("http://purl.org/dc/terms/title", [])
+        title = title_entries[0].get("value") if title_entries else None
+        if title in _SYSTEM_FOLDER_TITLES:
+            continue
+        folders.append({"title": title, "uri": folder_uri})
+    return folders

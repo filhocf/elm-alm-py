@@ -465,6 +465,57 @@ async def update_requirement(
     return await oslc.update_requirement(uri, title=title, xhtml=content)
 
 
+@tool
+async def list_types(domain: str, project: str) -> list[dict]:
+    """List resource types (shapes) available in a project area, with each shape URI.
+
+    Args:
+        domain: rm (DOORS Next) | ccm (RTC) | qm (ETM)
+        project: Project name (as shown by list_projects)
+
+    Returns [{"title", "shape_uri", "resource_type"}].
+    """
+    domain = domain.lower()
+    if domain not in VALID_DOMAINS:
+        raise ToolError(f"Invalid domain '{domain}'. Must be one of: {VALID_DOMAINS}")
+    return await oslc.list_resource_shapes(domain, project)
+
+
+@tool
+async def list_fields(domain: str, project: str, type: str) -> dict:
+    """List required/optional fields of a type, with allowedValues when enumerated.
+
+    Args:
+        domain: rm | ccm | qm
+        project: Project name
+        type: Shape title (as shown by list_types); matched case-insensitively
+
+    Returns {"type", "shape_uri", "required":[...], "optional":[...]}.
+    """
+    domain = domain.lower()
+    if domain not in VALID_DOMAINS:
+        raise ToolError(f"Invalid domain '{domain}'. Must be one of: {VALID_DOMAINS}")
+    return await oslc.list_fields(domain, project, type)
+
+
+@tool
+async def inspect_workitem(id: str) -> dict:
+    """Read a real work item and derive its shape/factory and filled fields.
+
+    Args:
+        id: Work item ID (number)
+
+    Returns {"id", "type", "shape_uri", "factory_uri", "fields":{...}}.
+    """
+    return await oslc.inspect_workitem(id)
+
+
+@tool
+async def list_folders(project: str) -> list[dict]:
+    """List RM (DOORS Next) folders for a project. Returns [{"title", "uri"}]."""
+    return await oslc.list_folders(project)
+
+
 def main():
     """Entry point for the MCP server."""
     mcp.run(transport="stdio")
