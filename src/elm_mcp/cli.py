@@ -1,4 +1,4 @@
-"""CLI for elm-alm-py — credential setup and testing."""
+"""CLI for elm-mcp — credential setup and testing."""
 
 import base64
 import getpass
@@ -67,7 +67,7 @@ def main() -> None:
 
         serve()
     else:
-        print("Uso: elm-alm-py [login|serve]")
+        print("Uso: elm-mcp [login|serve]")
         sys.exit(1)
 
 

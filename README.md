@@ -1,4 +1,4 @@
-# elm-alm-py
+# elm-mcp
 
 MCP server for **IBM Engineering Lifecycle Management (ELM)** — read and write access to DOORS Next (RM), RTC/EWM (CCM), and ETM (QM) via OSLC REST APIs.
 
@@ -15,7 +15,7 @@ uv pip install -e .
 ### Option 1: Credentials file (recommended)
 
 ```bash
-elm-alm-py login
+elm-mcp login
 ```
 
 Saves to `~/.elm_creds.json`:
@@ -35,7 +35,7 @@ export ELM_PASSWORD=secret
 
 ```bash
 # As MCP server (stdio)
-elm-alm-py
+elm-mcp
 ```
 
 ### MCP client configuration
@@ -44,7 +44,7 @@ elm-alm-py
 {
   "mcpServers": {
     "elm-alm": {
-      "command": "/path/to/.venv/bin/elm-alm-py"
+      "command": "/path/to/.venv/bin/elm-mcp"
     }
   }
 }

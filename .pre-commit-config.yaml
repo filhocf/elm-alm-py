@@ -1,4 +1,4 @@
-# Pre-commit hooks for elm-alm-py.
+# Pre-commit hooks for elm-mcp.
 # Mirrors the lint stage of .github/workflows/ci.yml (ruff check + ruff format).
 # Runs locally on commit and on pre-commit.ci for pull requests.
 ci:

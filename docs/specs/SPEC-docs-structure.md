@@ -31,4 +31,4 @@ ARCHITECTURE coerente com o código, legados arquivados.
 Majoritariamente mecânico (G4 direto); review leve no fim.
 
 ## Fontes
-- **F3**: estrutura `~/git/orc/orc/docs/{adr,rfc,specs}/` (referência); estado inicial dos docs do elm-alm-py.
+- **F3**: estrutura `~/git/orc/orc/docs/{adr,rfc,specs}/` (referência); estado inicial dos docs do elm-mcp.

@@ -4,7 +4,7 @@
 
 ## Contexto
 
-O elm-alm-py precisa servir qualquer servidor IBM ELM, mas a implementação cresceu com acoplamento a
+O elm-mcp precisa servir qualquer servidor IBM ELM, mas a implementação cresceu com acoplamento a
 um tenant concreto: default `project="MEU IMOVEL RURAL (MIR)"` em `add_child_workitem`, exemplos com
 host e namespaces de um cliente específico no README/USAGE, lógica de campos customizados nos scripts
 externos (jandaia). As propriedades de work item (filedAgainst, teamArea, plannedFor, campos custom,

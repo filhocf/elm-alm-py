@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
-from elm_alm_py.server import list_projects, mcp, transition_workitem
+from elm_mcp.server import list_projects, mcp, transition_workitem
 
 VALID_DOMAINS = ("rm", "ccm", "qm")
 
@@ -67,7 +67,7 @@ async def test_transition_workitem_success():
     mock_client.get = AsyncMock(side_effect=[mock_get_resp, mock_actions_resp])
     mock_client.put = AsyncMock(return_value=mock_put_resp)
 
-    with patch("elm_alm_py.oslc.get_client", return_value=mock_client):
+    with patch("elm_mcp.oslc.get_client", return_value=mock_client):
         result = await transition_workitem(id="12345", action="resolve")
 
     assert "12345" in result

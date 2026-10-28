@@ -10,7 +10,7 @@ especial em Windows. "Clonar/instalar → tem o MCP funcionando".
 
 ## Escopo
 
-- Distribuição por PyPI + execução via `uvx elm-alm-py` (zero clone, zero venv manual).
+- Distribuição por PyPI + execução via `uvx elm-mcp` (zero clone, zero venv manual).
 - Snippet único de configuração `mcpServers` que sirva Kiro, OpenCode e Hermes (documentado).
 - Guia Windows em PowerShell nativo (sem WSL); `uvx` funciona no Windows.
 - `login` guiado: URL → usuário → senha → testa conexão → grava (keyring, via `SPEC-credential-keyring`)
@@ -18,7 +18,7 @@ especial em Windows. "Clonar/instalar → tem o MCP funcionando".
 
 ## Critério de aceite (EARS)
 
-- QUANDO o usuário rodar `uvx elm-alm-py`, o sistema DEVE iniciar o MCP server sem instalação manual de venv.
+- QUANDO o usuário rodar `uvx elm-mcp`, o sistema DEVE iniciar o MCP server sem instalação manual de venv.
 - O README DEVE conter um snippet `mcpServers` pronto para Kiro, OpenCode e Hermes.
 - O guia de instalação DEVE cobrir Windows em PowerShell nativo (sem WSL).
 - QUANDO o `login` guiado terminar, o sistema DEVE ter validado a conexão ao ELM e gravado a credencial

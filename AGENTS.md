@@ -1,4 +1,4 @@
-# AGENTS.md — elm-alm-py
+# AGENTS.md — elm-mcp
 
 ## Project Overview
 

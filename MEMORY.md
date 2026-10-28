@@ -1,9 +1,9 @@
-# MEMORY.md — elm-alm-py
+# MEMORY.md — elm-mcp
 
 ## Estado Atual (18/mai/2026)
 
 - **Versão**: 0.1.0 (10 commits, branch main)
-- **Repo**: https://github.com/filhocf/elm-alm-py
+- **Repo**: https://github.com/filhocf/elm-mcp
 - **Status**: ✅ Testado end-to-end contra ELM real
 
 ## Feito
@@ -11,7 +11,7 @@
 - 6 tools: list_projects, search_requirements, get_requirement, list_workitems, get_workitem, search_testcases
 - Auth: form-based Jazz com cookies (httpx AsyncClient singleton)
 - Config: env vars + ~/.elm_creds.json (base64 password)
-- CLI: `elm-alm-py login` (setup interativo) + `elm-alm-py serve` (MCP stdio)
+- CLI: `elm-mcp login` (setup interativo) + `elm-mcp serve` (MCP stdio)
 - OSLC: discovery via rootservices → catalog → ServiceProvider → QueryCapability
 - Namespaces: corrigidos para ELM 7.0.3 (Discovery 1.0 para RM, OSLC Core para CCM/QM)
 - RM: endpoint /views com projectURL (DOORS Next não expõe QueryCapability padrão)

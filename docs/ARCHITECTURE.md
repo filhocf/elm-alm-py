@@ -1,6 +1,6 @@
 # Architecture
 
-elm-alm-py is an MCP server that exposes IBM Engineering Lifecycle Management (ELM) over the
+elm-mcp is an MCP server that exposes IBM Engineering Lifecycle Management (ELM) over the
 open **OSLC REST** protocol. It is an independent implementation (not a fork; no IBM client
 library) and vendor-neutral: the package carries no organization-specific values. See
 `docs/adr/ADR-001` (OSLC, not a fork) and `docs/adr/ADR-003` (generic core + adaptation layer).

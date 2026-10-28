@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "elm-alm-py"
-version = "0.3.0"
+name = "elm-mcp"
+version = "0.4.0"
 description = "MCP server for IBM Engineering Lifecycle Management (ELM) via OSLC REST API"
 readme = "README.md"
 license = "MIT"
@@ -47,10 +47,10 @@ dev = [
 ]
 
 [project.scripts]
-elm-alm-py = "elm_alm_py.cli:main"
+elm-mcp = "elm_mcp.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/elm_alm_py"]
+packages = ["src/elm_mcp"]
 
 [tool.ruff]
 target-version = "py310"
@@ -61,5 +61,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["elm_alm_py"]
-omit = ["src/elm_alm_py/cli.py"]
+source = ["elm_mcp"]
+omit = ["src/elm_mcp/cli.py"]

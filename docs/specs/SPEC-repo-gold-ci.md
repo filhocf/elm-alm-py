@@ -5,7 +5,7 @@
 
 ## Meta
 
-Aplicar no elm-alm-py (como PILOTO do checklist repo-ouro do DAIA) a maquinaria agêntica que faz o
+Aplicar no elm-mcp (como PILOTO do checklist repo-ouro do DAIA) a maquinaria agêntica que faz o
 processo viajar com o repositório — não depender do harness local do dono.
 
 ## Escopo (checklist repo-ouro, camadas 2 e 3)
@@ -18,12 +18,13 @@ processo viajar com o repositório — não depender do harness local do dono.
 - [ ] **SHA-pin** nas actions do CI (`actions/checkout@<sha>`, não `@v4` móvel).
 - [ ] **`links.yml`** — links markdown internos por PR, externos em cron.
 - [ ] **Review-skill no repo** (`.agents/skills/pr-review/SKILL.md`) + workflow `/review` (read-only)
-  com Kiro headless. **`/fix` fica para decisão** (push automático vs commit que exige re-review —
-  RFC-001 §7); começar só com `/review`.
+  com Kiro headless. O agente analisa o diff e **comenta** os achados; a correção volta para o dev
+  resolver localmente e re-submeter. **Sem** `/fix` automático (decisão 28/out).
 
-## Decisão pendente (RFC-001 §7)
-`/fix` com push automático (fakeflix) **ou** commit que exige re-review. Recomendação do Zero:
-conservador (re-review) primeiro; testar o automático aqui por ser repo de baixo custo.
+## Decisão (Claudio, 28/out): SOMENTE `/review`, sem `/fix` automático
+Implementar apenas o `/review` (read-only: o agente analisa a PR e comenta os achados). A correção
+**volta para o dev**, que resolve na máquina local e re-submete. **NÃO** implementar `/fix` com o
+agente escrevendo no repo (nem push automático, nem commit). Agente não corrige código sozinho agora.
 
 ## Critério de aceite (EARS)
 
