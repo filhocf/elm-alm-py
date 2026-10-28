@@ -1,4 +1,6 @@
-<h1 align="center">elm-mcp</h1>
+<p align="center">
+  <img src="docs/assets/elm-mcp-light.svg" alt="elm-mcp" width="360">
+</p>
 
 <p align="center"><strong>Bring IBM Engineering Lifecycle Management to your AI agent.</strong><br>
 An MCP server that reads and writes requirements, work items and test cases in IBM ELM
