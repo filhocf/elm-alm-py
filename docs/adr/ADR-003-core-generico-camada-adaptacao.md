@@ -14,7 +14,7 @@ tipos custom, estados de workflow) **variam por servidor e por PA**.
 
 Separar em duas camadas:
 
-- **Core (`elm_alm_py`)** — genérico IBM ELM/OSLC. Namespaces IBM/Jazz (oslc, oslc_cm, oslc_rm,
+- **Core (`elm_mcp`)** — genérico IBM ELM/OSLC. Namespaces IBM/Jazz (oslc, oslc_cm, oslc_rm,
   rtc_cm, rtc_ext, jazz_rm, nav, calm, dcterms, process). Discovery dinâmico. CRUD RM/CCM/QM. Workflow
   genérico. **Zero strings de tenant** (nenhum nome de empresa/PA/host fixo).
 - **Camada de adaptação (perfil por PA)** — host do servidor, nome da PA, filedAgainst/teamArea/

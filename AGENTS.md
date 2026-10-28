@@ -7,7 +7,7 @@ MCP server providing read-only access to IBM Engineering Lifecycle Management (E
 ## Architecture
 
 ```
-src/elm_alm_py/
+src/elm_mcp/
 ├── __init__.py       # Package version
 ├── cli.py            # CLI: 'login' (credential setup) or 'serve' (MCP stdio)
 ├── config.py         # Settings via pydantic-settings (env vars + ~/.elm_creds.json fallback)
@@ -78,7 +78,7 @@ rootservices → oslc_qm_v1:qmServiceProviders → catalog (OSLC Core ServicePro
 
 ```bash
 uv sync --group dev
-uv run pytest tests/ -v --cov=elm_alm_py --cov-report=term-missing
+uv run pytest tests/ -v --cov=elm_mcp --cov-report=term-missing
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 ```

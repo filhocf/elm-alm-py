@@ -15,7 +15,7 @@ IBM ELM exposes three OSLC domains, each a separate Jazz application:
 | CCM | EWM / RTC (Change & Config Mgmt) | `/ccm/rootservices` |
 | QM  | ETM (Test Management)            | `/qm/rootservices`  |
 
-## Module layout (`src/elm_alm_py/`)
+## Module layout (`src/elm_mcp/`)
 
 | Module | Responsibility |
 |--------|----------------|
@@ -53,7 +53,7 @@ Discovery 1.0 variant). `oslc.py` handles the three patterns.
 
 ## Core vs adaptation layer
 
-The **core** (`elm_alm_py`) speaks generic ELM/OSLC: IBM/Jazz namespaces, discovery, CRUD, links.
+The **core** (`elm_mcp`) speaks generic ELM/OSLC: IBM/Jazz namespaces, discovery, CRUD, links.
 The **adaptation layer** (per project-area profile) supplies concrete values — server host, project
 name, required custom fields, custom work-item types, workflow state map, RM folders — discovered via
 OSLC discovery and never hardcoded. See `docs/adr/ADR-003`. This keeps the published package reusable

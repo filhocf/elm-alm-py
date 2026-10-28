@@ -30,7 +30,7 @@ Evoluir o elm-mcp em duas frentes, por releases rastreáveis (`docs/roadmap.md`)
 
 - **Não é fork.** Implementação própria sobre o protocolo **OSLC REST** (OASIS). Não usa a lib
   `elmclient` da IBM. Decisão: `docs/adr/ADR-001`.
-- **Tenant-neutro.** O core (`elm_alm_py`) não cita nenhum cliente/empresa. Valores concretos de
+- **Tenant-neutro.** O core (`elm_mcp`) não cita nenhum cliente/empresa. Valores concretos de
   servidor/PA/campos vivem numa **camada de adaptação** (perfil por project area), descoberta via
   discovery OSLC. Decisão: `docs/adr/ADR-003`.
 - **mcp 2.x.** Server sobre `MCPServer` (não FastMCP). Decisão: `docs/adr/ADR-002`.

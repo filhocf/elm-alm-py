@@ -131,7 +131,7 @@ Values can be:
 
 ```bash
 uv sync --group dev
-uv run pytest tests/ -v --cov=elm_alm_py
+uv run pytest tests/ -v --cov=elm_mcp
 uv run ruff check src/ tests/
 ```
 
