@@ -5,6 +5,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
+Renamed from `elm-alm-py` to **`elm-mcp`** and professionalized into a first-class OSS project.
+
+### Changed
+
+- **Renamed package `elm-alm-py` → `elm-mcp`** (distribution, module `elm_mcp`, CLI command `elm-mcp`, repository).
+- Migrated to MCP SDK 2.x: `FastMCP` → `MCPServer`; `ToolError` for user-facing errors; pinned `mcp>=2.3,<3`.
+- `add_child_workitem` requires an explicit `project` (removed the hardcoded default).
+
+### Removed
+
+- Dead code: `_find_creation_factory` (no production caller) and its two tests.
+- All organization-specific references from code and tests (vendor-neutral: generic placeholders only).
+
 ### Added
 
 - `get_plan_items` tool — hierarchical sprint view returning backlog items with their child tasks expanded in a single call, selected by `item_ids` or by `plan` (iteration title substring) (#26)

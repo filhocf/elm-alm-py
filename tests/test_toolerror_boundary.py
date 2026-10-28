@@ -56,7 +56,7 @@ async def test_list_projects_translates_oslc_valueerror_to_toolerror():
 
 async def test_search_requirements_translates_project_not_found():
     """'Project not found' is the most common user error — must be legible."""
-    msg = "Project 'Nope' not found. Available: ['MIR']"
+    msg = "Project 'Nope' not found. Available: ['PROJ']"
     with (
         patch(
             "elm_mcp.server.oslc.query_resources",
@@ -76,7 +76,7 @@ async def test_list_workitems_translates_runtimeerror():
         ),
         pytest.raises(ToolError, match="Expected 201 Created"),
     ):
-        await list_workitems("MIR")
+        await list_workitems("PROJ")
 
 
 def test_tool_wrapper_preserves_tool_names():

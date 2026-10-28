@@ -133,7 +133,7 @@ async def test_create_workitem_invalid_type_raises_toolerror():
     RED now: raises plain ValueError on type='epic'.
     """
     with pytest.raises(ToolError, match="Invalid type"):
-        await create_workitem(project="MIR", title="X", type="epic")
+        await create_workitem(project="PROJ", title="X", type="epic")
 
 
 async def test_update_workitem_no_fields_raises_toolerror():

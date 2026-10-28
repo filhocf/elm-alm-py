@@ -37,7 +37,7 @@ CCM_CATALOG_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
     xmlns:oslc="http://open-services.net/ns/core#">
     <oslc:serviceProvider>
         <oslc:ServiceProvider rdf:about="{BASE}/ccm/oslc/contexts/_proj1/workitems/services.xml">
-            <dcterms:title>MIR</dcterms:title>
+            <dcterms:title>PROJ</dcterms:title>
         </oslc:ServiceProvider>
     </oslc:serviceProvider>
 </oslc:ServiceProviderCatalog>
@@ -96,7 +96,7 @@ async def test_list_service_providers_ccm():
     respx.get(f"{BASE}/ccm/rootservices").mock(return_value=httpx.Response(200, text=CCM_ROOTSERVICES_XML))
     respx.get(f"{BASE}/ccm/oslc/workitems/catalog").mock(return_value=httpx.Response(200, text=CCM_CATALOG_XML))
     providers = await oslc.list_service_providers("ccm")
-    assert providers == [{"title": "MIR", "url": f"{BASE}/ccm/oslc/contexts/_proj1/workitems/services.xml"}]
+    assert providers == [{"title": "PROJ", "url": f"{BASE}/ccm/oslc/contexts/_proj1/workitems/services.xml"}]
 
 
 @respx.mock
@@ -137,7 +137,7 @@ async def test_query_resources_ccm_json():
     respx.get(services_url).mock(return_value=httpx.Response(200, text=CCM_SERVICES_XML))
     respx.get(query_base).mock(return_value=httpx.Response(200, json=results_payload))
 
-    results = await oslc.query_resources("ccm", "MIR", where='dcterms:title="X"', select="dcterms:title")
+    results = await oslc.query_resources("ccm", "PROJ", where='dcterms:title="X"', select="dcterms:title")
     assert len(results) == 2
     assert results[0]["dcterms:title"] == "WI 1"
 

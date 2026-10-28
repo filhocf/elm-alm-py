@@ -20,21 +20,25 @@ Esforço 🟢 baixo · 🟡 médio · 🔴 alto. Status por spec no cabeçalho d
 
 | Release | Tema | SPECs | Esf |
 |---------|------|-------|-----|
-| **v0.4.0** | Migração mcp 2.x (feita — falta taggear/publicar) | `_archive/SPEC-mcp2x-migration` | ✅ |
-| **v0.5.0** | Profissionalização / repo-ouro | `SPEC-dead-code-cleanup`, `SPEC-docs-structure`, `SPEC-tenant-neutral`, `SPEC-repo-gold-ci` | 🟢 |
-| **v0.6.0** | RM write + discovery (membrana agêntica P0) | `SPEC-rm-create-requirement`, `SPEC-discovery-tools` | 🟡 |
-| **v0.7.0** | Rastreabilidade + tipos | `SPEC-oslc-links`, `SPEC-wi-custom-types` | 🟡 |
-| **v0.8.0** | Teste + relatórios | `SPEC-qm-write`, `SPEC-reportbuilder-rs` | 🔴 |
-| **v0.9.0** | Instalação first-class + credenciais | `SPEC-credential-keyring`, `SPEC-first-class-install` | 🟡 |
+| **v0.4.0** (não publicada — engloba toda a base profissional) | mcp 2.x + rename + profissionalização / repo-ouro | migração mcp2x (feita) · `SPEC-dead-code-cleanup` · `SPEC-docs-structure` (feita) · `SPEC-tenant-neutral` · `SPEC-repo-gold-ci` · `SPEC-readme-profissional` · ADR-004 (nome) | 🟢 |
+| **v0.5.0** | RM write + discovery (membrana agêntica P0) | `SPEC-rm-create-requirement`, `SPEC-discovery-tools` | 🟡 |
+| **v0.6.0** | Rastreabilidade + tipos | `SPEC-oslc-links`, `SPEC-wi-custom-types` | 🟡 |
+| **v0.7.0** | Teste + relatórios | `SPEC-qm-write`, `SPEC-reportbuilder-rs` | 🔴 |
+| **v0.8.0** | Instalação first-class + credenciais | `SPEC-credential-keyring`, `SPEC-first-class-install` | 🟡 |
 | **v1.0.0** | Quando o conjunto estiver sólido (decisão do Claudio) | — | — |
+
+> **Renumeração (28/out):** a v0.4.0 não foi publicada no PyPI (só 0.1/0.2 estão lá), então ela
+> absorve toda a base profissional (mcp2x + rename + higiene + repo-ouro + README) e só é publicada
+> quando o repo estiver "primeira linha". As features sobem um degrau (RM write era v0.6, agora v0.5).
 
 ## Ordem de ataque
 
-1. **v0.5.0 primeiro** — higiene destrava tudo (remove dead code, tenant-neutro, docs no padrão,
-   gate agêntico no repo). Baixo risco, alto efeito de base. É o piloto do checklist repo-ouro do DAIA.
-2. **v0.6.0** — `create_requirement` é o pedido nº 1 do DAIA (membrana); discovery habilita a camada
+1. **Fechar a v0.4.0** antes de publicar: README profissional + dead-code + tenant-neutral no código
+   + repo-gold-ci + ADR-004. Baixo risco, alto efeito de base. Piloto do checklist repo-ouro do DAIA.
+2. **Publicar v0.4.0** no PyPI (tag `v0.4.0` → `publish.yml`) com o repo já profissional.
+3. **v0.5.0** — `create_requirement` é o pedido nº 1 do DAIA (membrana); discovery habilita a camada
    de adaptação dinâmica por PA.
-3. v0.7 → v0.9 na ordem da tabela; cada uma pode ser reordenada conforme necessidade do DAIA.
+4. v0.6 → v0.8 na ordem da tabela; cada uma pode ser reordenada conforme necessidade do DAIA.
 
 ## Fora de escopo (limite da plataforma, não do roadmap)
 
