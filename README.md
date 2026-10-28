@@ -2,7 +2,7 @@
 
 MCP server for **IBM Engineering Lifecycle Management (ELM)** — read and write access to DOORS Next (RM), RTC/EWM (CCM), and ETM (QM) via OSLC REST APIs.
 
-Tested against ELM 7.0.3 (alm.dataprev.gov.br).
+Independent implementation over the open OSLC REST protocol — **not a fork** of IBM software, and vendor-neutral (no organization-specific values in the package). Tested against ELM 7.0.3.
 
 ## Install
 
@@ -75,12 +75,12 @@ elm-alm-py
 
 | Parameter | Required | Description |
 |-----------|:--------:|-------------|
-| `project` | ✅ | Project name (e.g., "MEU IMOVEL RURAL (MIR)") |
+| `project` | ✅ | Project name (e.g., "MY PROJECT (KEY)") |
 | `title` | ✅ | Work item title |
 | `type` | | "task" (default), "story", or "defect" |
 | `description` | | HTML description |
 | `parent_id` | | Parent work item ID (creates child link) |
-| `owner` | | Username (e.g., "claudio.filho") |
+| `owner` | | Username (e.g., "jdoe") |
 | `filed_against` | | Category URI. Auto-discovered if not provided |
 | `custom_fields` | | Dict of extra RDF fields (see below) |
 
@@ -90,8 +90,8 @@ Some RTC projects require custom fields. Pass them as a dict:
 
 ```python
 custom_fields={
-    "rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": {
-        "rdf:resource": "https://server/ccm/oslc/enumerations/{projectAreaId}/..."
+    "rtc_ext:com.company.team.workitem.attribute.customattr": {
+        "rdf:resource": "https://elm.company.com/ccm/oslc/enumerations/{projectAreaId}/..."
     }
 }
 ```
@@ -108,7 +108,6 @@ Values can be:
 |------|-------------|-------------------------|
 | task | `task` | `requirementChangeRequest` |
 | story | `com.ibm.team.apt.workItemType.story` | `planItem` |
-| defect | `defect` | `defect` |
 
 ### Key Fields
 
@@ -136,11 +135,12 @@ uv run pytest tests/ -v --cov=elm_alm_py
 uv run ruff check src/ tests/
 ```
 
-## Known Limitations
+## Notes
 
-- `_find_default_category` returns first category from list (may not be correct for your project). Use `filed_against` parameter explicitly.
-- `update_workitem` supports title, description, owner, estimate_hours, planned_for, and custom_fields.
-- OSLC CM 1.0 services.xml parsing is bypassed — creation URL is constructed directly.
+- Category auto-discovery picks the first category of the project; pass `filed_against` explicitly when there is more than one.
+- OSLC CM 1.0 `services.xml` parsing is bypassed — the creation URL is constructed directly.
+
+See [docs/USAGE.md](docs/USAGE.md) for query syntax and more examples.
 
 ## License
 

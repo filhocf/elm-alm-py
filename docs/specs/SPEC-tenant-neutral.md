@@ -19,12 +19,12 @@ configuração/perfil, nunca no código ou na doc pública.
   Remover a seção "Known Limitations" que expõe detalhe interno impróprio para OSS.
 - **docs/USAGE.md:** trocar todas as URLs `alm.dataprev.gov.br` e namespaces `com.dataprev.*` por genéricos.
 
-## Critério de aceite
+## Critério de aceite (EARS)
 
-- `grep -rniE "dataprev|MEU IMOVEL|MIR" src/ README.md docs/USAGE.md` → 0 ocorrências (fora de exemplos
-  explicitamente marcados como placeholder neutro).
-- `add_child_workitem` sem default de PA; teste cobre a ausência de default.
-- README coerente com o código (sem `defect` se não implementado).
+- O sistema NÃO DEVE conter a string `dataprev`, `MEU IMOVEL` ou `MIR` em `src/`, `README.md` ou `docs/USAGE.md` (fora de placeholders neutros explícitos).
+- QUANDO `add_child_workitem` for chamado sem `project`, o sistema DEVE exigir o valor (sem default de PA), e um teste DEVE cobrir essa ausência.
+- O `README.md` DEVE ser coerente com o código (não listar tipos de work item que o código não implementa).
+- SE algum exemplo precisar de host/PA/usuário, ENTÃO o sistema DEVE usar placeholders neutros (`elm.company.com`, `MY PROJECT (KEY)`, `jdoe`, `com.company.*`).
 
 ## Gates
 G0 → G3 (teste da obrigatoriedade de project) → G4 → G5.

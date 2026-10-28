@@ -16,15 +16,16 @@ ARCHITECTURE coerente com o código, legados arquivados.
 - [x] `docs/roadmap.md` (Plano, releases v0.4→v0.9).
 - [x] RFC-001 reescrita enxuta (visão, não big-bang) apontando specs.
 - [x] ADR-001/002/003 retroativos.
-- [ ] `docs/ARCHITECTURE.md` novo (substitui o SPEC.md legado obsoleto que dizia "read-only"),
-  coerente com as 12 tools e a arquitetura core/adaptação; validado contra o grafo.
-- [ ] `docs/CONVENTIONS.md` (rule vs practice, estilo orc) + `docs/TOOLS.md` (referência das tools).
+- [x] `docs/ARCHITECTURE.md` novo (substitui o SPEC.md legado obsoleto), coerente com as 12 tools e a arquitetura core/adaptação.
+- [x] `docs/CONVENTIONS.md` (rule vs practice, idioma Opção B, zero-tenant, EARS-PT) + `docs/TOOLS.md` (referência das 12 tools).
 - [ ] Criar as demais specs atômicas (v0.6→v0.9) em estado PLANNED.
 
-## Critério de aceite
+## Critério de aceite (EARS)
 
-- Árvore `docs/` espelha o padrão orc (adr/rfc/specs + topo). Nenhum doc solto obsoleto na raiz de docs.
-- `ARCHITECTURE.md` descreve CRUD atual (não "read-only"). Links internos válidos (links-check).
+- A árvore `docs/` DEVE espelhar o padrão orc (adr/rfc/specs + docs de topo), sem doc obsoleto solto na raiz de `docs/`.
+- O sistema DEVE conter `docs/ARCHITECTURE.md` descrevendo o CRUD atual (não "read-only").
+- QUANDO um link markdown interno for quebrado, a verificação de links DEVE falhar (via `links` CI, quando existir).
+- O sistema DEVE conter `docs/CONVENTIONS.md` e `docs/TOOLS.md`.
 
 ## Gates
 Majoritariamente mecânico (G4 direto); review leve no fim.

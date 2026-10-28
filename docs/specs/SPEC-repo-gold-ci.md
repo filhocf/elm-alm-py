@@ -25,12 +25,13 @@ processo viajar com o repositório — não depender do harness local do dono.
 `/fix` com push automático (fakeflix) **ou** commit que exige re-review. Recomendação do Zero:
 conservador (re-review) primeiro; testar o automático aqui por ser repo de baixo custo.
 
-## Critério de aceite
+## Critério de aceite (EARS)
 
-- `.codebase-memory/graph.db.zst` no git; `git clone` traz o grafo.
-- `tests-prove-fix` verde num PR real (e provado que reprova um teste que não pega a mudança).
-- Um PR que toca `src/` sem fragmento de changelog é barrado por `changelog.yml`.
-- Actions todas com SHA. `/review` por comentário funciona com Kiro.
+- O sistema DEVE versionar `.codebase-memory/graph.db.zst`; QUANDO o repositório for clonado, o grafo DEVE vir junto (sem reindexação).
+- QUANDO um PR alterar testes, o job `tests-prove-fix` DEVE rodá-los contra a base e DEVE falhar se eles não falharem sem a mudança.
+- SE um PR tocar `src/` sem um fragmento `changelog.d/`, ENTÃO o CI DEVE barrá-lo.
+- O sistema DEVE referenciar todas as actions do CI por SHA (não por tag móvel).
+- QUANDO um comentário `/review` for postado num PR, o reviewer agêntico (Kiro) DEVE revisar o diff (read-only).
 
 ## Gates
 G0 → G3 (teste do script prove-fix) → G4 (workflows + scripts) → G5.

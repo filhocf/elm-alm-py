@@ -18,11 +18,12 @@ comportamento observável.
   .gitignore; limpar local).
 - `MEMORY.md` na raiz — resquício; avaliar mover para `docs/_archive/` ou remover (não é artefato OSS).
 
-## Critério de aceite
+## Critério de aceite (EARS)
 
-- `_find_creation_factory` e seus 2 testes removidos; suíte segue verde (testes restantes passam).
-- `trace_path`/grep confirmam nenhum outro símbolo com 0 chamadores de produção que seja removível.
-- Cobertura não cai abaixo do gate (a remoção de código morto + seus testes tende a manter/subir %).
+- **Ubíquo:** O sistema DEVE manter verde toda a suíte de testes após a remoção (os testes de produção remanescentes passam).
+- **Dirigido a evento:** QUANDO `_find_creation_factory` e seus 2 testes forem removidos, o sistema NÃO DEVE conter nenhum símbolo com zero chamadores de produção que seja removível (confirmado por `trace_path`/grep).
+- **Indesejado:** SE a remoção fizer a cobertura cair abaixo do gate do CI, ENTÃO a mudança DEVE ser revista antes do merge.
+- **Ubíquo:** O working tree NÃO DEVE conter caches versionados (`.coverage`, `.pytest_cache/`, `.ruff_cache/`).
 
 ## Gates
 G0 (esta spec) → G3 (garantir que nenhum teste de produção depende) → G4 (remover) → G5 (review).
