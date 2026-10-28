@@ -1,4 +1,8 @@
-# Usage Patterns & Known Limitations
+# Usage Patterns
+
+Examples use placeholder values. Replace the server host (`https://elm.company.com`),
+project names, user logins and resource URIs with the ones discovered for your own
+ELM project area.
 
 ## Query Syntax (list_workitems, search_requirements)
 
@@ -6,72 +10,65 @@ OSLC query syntax. Examples:
 
 ```python
 # By title
-list_workitems(project="MIR", query='dcterms:title="Produção certa"')
+list_workitems(project="MY PROJECT (KEY)", query='dcterms:title="Some title"')
 
 # By iteration (plannedFor)
-list_workitems(project="MIR", query='rtc_cm:plannedFor=<https://alm.dataprev.gov.br/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA>')
+list_workitems(project="MY PROJECT (KEY)", query='rtc_cm:plannedFor=<https://elm.company.com/ccm/oslc/iterations/_ITERATION_OID>')
 
 # By type
-list_workitems(project="MIR", query='dcterms:type="Tarefa"')
+list_workitems(project="MY PROJECT (KEY)", query='dcterms:type="Task"')
 
 # By state
-list_workitems(project="MIR", query='rtc_cm:state=<https://alm.dataprev.gov.br/ccm/oslc/workflows/_MWxBEJB7Ee-fe_bes9r78g/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s1>')
+list_workitems(project="MY PROJECT (KEY)", query='rtc_cm:state=<https://elm.company.com/ccm/oslc/workflows/_WORKFLOW_OID/states/com.ibm.team.workitem.taskWorkflow/com.ibm.team.workitem.taskWorkflow.state.s1>')
 ```
 
 ## Creating Work Items
 
 ```python
 # Minimal (auto-discovers category and iteration)
-create_workitem(project="MIR", title="My Task", type="task")
+create_workitem(project="MY PROJECT (KEY)", title="My Task", type="task")
 
-# With all fields (recommended for Dataprev)
+# With explicit fields (project-specific attributes)
 create_workitem(
-    project="MIR",
+    project="MY PROJECT (KEY)",
     title="My Task",
     type="task",
-    owner="claudio.filho",
-    filed_against="https://alm.dataprev.gov.br/ccm/resource/itemOid/com.ibm.team.workitem.Category/_ekfVwJB7Ee-fe_bes9r78g",
+    owner="jdoe",
+    filed_against="https://elm.company.com/ccm/resource/itemOid/com.ibm.team.workitem.Category/_CATEGORY_OID",
     custom_fields={
-        "rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": {
-            "rdf:resource": "https://alm.dataprev.gov.br/ccm/oslc/enumerations/_MWxBEJB7Ee-fe_bes9r78g/com.dataprev.team.workitem.enumeration.categoriatarefa/com.dataprev.team.workitem.enumeration.categoriatarefa.literal.l10"
+        "rtc_ext:com.company.team.workitem.attribute.customattr": {
+            "rdf:resource": "https://elm.company.com/ccm/oslc/enumerations/_PROJECT_AREA_OID/com.company.team.workitem.enumeration.customattr/com.company.team.workitem.enumeration.customattr.literal.l10"
         }
     },
 )
 
-# Child task (under an IB)
+# Child task (under a parent work item)
 add_child_workitem(parent_id="628430", title="Sub-task", type="task")
 ```
+
+> Project-specific attributes (category, iteration, custom `rtc_ext:*` fields) vary per
+> server and per project area. Discover them for your project rather than copying the
+> placeholders above (see the adaptation layer / discovery tools on the roadmap).
 
 ## Updating Work Items
 
 ```python
 # Set owner + estimate
-update_workitem(id="629772", owner="claudio.filho", estimate_hours=16)
+update_workitem(id="629772", owner="jdoe", estimate_hours=16)
 
 # Set iteration
-update_workitem(id="629772", planned_for="https://alm.dataprev.gov.br/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA")
+update_workitem(id="629772", planned_for="https://elm.company.com/ccm/oslc/iterations/_ITERATION_OID")
 
 # Custom fields
 update_workitem(id="629772", custom_fields={"rtc_cm:someField": "value"})
 ```
 
-## Known Limitations
+## Notes
 
-1. **_find_default_category** returns first category from project (may not be correct). Pass `filed_against` explicitly for MIR.
-
-2. **_find_current_iteration** prefers bounded iterations (with endDate). If your sprint doesn't appear, pass `planned_for` explicitly in update_workitem.
-
-3. **Iteration list is slow** — fetches details for each of 50 iterations. Use `list_iterations` sparingly.
-
-4. **State transitions** not supported via update_workitem. RTC requires workflow action, not direct state change.
-
-5. **RM domain (DOORS Next)** uses regex fallback for discovery (OSLC 1.0 format differs from CCM).
-
-## MIR Project Constants
-
-```python
-PROJECT_AREA_ID = "_MWxBEJB7Ee-fe_bes9r78g"
-CATEGORY_MIR = "https://alm.dataprev.gov.br/ccm/resource/itemOid/com.ibm.team.workitem.Category/_ekfVwJB7Ee-fe_bes9r78g"
-ITERATION_SPRINT2 = "https://alm.dataprev.gov.br/ccm/oslc/iterations/_361O8T5XEfGJQth8TJaPLA"
-CATEGORIATAREFA_DEV = "https://alm.dataprev.gov.br/ccm/oslc/enumerations/_MWxBEJB7Ee-fe_bes9r78g/com.dataprev.team.workitem.enumeration.categoriatarefa/com.dataprev.team.workitem.enumeration.categoriatarefa.literal.l10"
-```
+- Category auto-discovery picks the first category of the project; pass `filed_against`
+  explicitly when the project has more than one.
+- Current-iteration auto-discovery prefers bounded iterations (with an end date); pass
+  `planned_for` explicitly if your sprint is not picked up.
+- `list_iterations` fetches details per iteration and can be slow on projects with many.
+- State changes go through `transition_workitem` (workflow action), not `update_workitem`.
+- RM (DOORS Next) discovery differs from CCM (OSLC 1.0 vs 2.0 catalog shapes).

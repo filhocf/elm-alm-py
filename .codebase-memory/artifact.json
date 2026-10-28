@@ -1,0 +1,12 @@
+{
+    "schema_version": 2,
+    "commit": "ebb06c5d1dded353be714e8b93500b6bb7979b3e",
+    "indexed_at": "2026-10-28T09:36:28Z",
+    "project": "home-claudio-git-elm-alm-py",
+    "nodes": 415,
+    "edges": 1350,
+    "original_size": 3735552,
+    "compressed_size": 434048,
+    "compression_level": 9,
+    "reconcile_basis": "git-clean-head"
+}

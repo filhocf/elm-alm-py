@@ -349,7 +349,7 @@ async def test_create_workitem_with_custom_fields():
         project="MEU IMOVEL RURAL (MIR)",
         title="Test Task",
         type="task",
-        custom_fields={"rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": "literal.l10"},
+        custom_fields={"rtc_ext:com.company.team.workitem.attribute.categoriatarefa": "literal.l10"},
     )
     assert result["dcterms:identifier"] == "42"
     # Verify custom field is in the posted body
@@ -378,7 +378,7 @@ async def test_create_workitem_without_custom_fields():
 
 
 # === GOLDEN PAYLOAD TESTS (based on real server validation 22/mai/2026) ===
-# These tests verify the EXACT behavior that creates WIs successfully on alm.dataprev.gov.br
+# These tests verify the EXACT behavior that creates WIs successfully on elm.company.com
 # Reference: WI #628430 (manual), WI #629768 (automated)
 
 PROJECT_AREA_ID = "_MWxBEJB7Ee-fe_bes9r78g"
@@ -456,8 +456,8 @@ async def test_golden_custom_fields_as_rdf_resource():
         title="Test",
         type="task",
         custom_fields={
-            "rtc_ext:com.dataprev.team.workitem.attribute.categoriatarefa": {
-                "rdf:resource": f"{BASE}/ccm/oslc/enumerations/{PROJECT_AREA_ID}/com.dataprev.team.workitem.enumeration.categoriatarefa/com.dataprev.team.workitem.enumeration.categoriatarefa.literal.l10"
+            "rtc_ext:com.company.team.workitem.attribute.categoriatarefa": {
+                "rdf:resource": f"{BASE}/ccm/oslc/enumerations/{PROJECT_AREA_ID}/com.company.team.workitem.enumeration.categoriatarefa/com.company.team.workitem.enumeration.categoriatarefa.literal.l10"
             }
         },
     )
